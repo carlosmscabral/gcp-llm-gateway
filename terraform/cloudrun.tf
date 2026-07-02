@@ -179,6 +179,9 @@ resource "google_cloud_run_v2_service" "gateway" {
     google_storage_bucket_iam_member.proxy_config_runtime,
     google_sql_user.app,
     terraform_data.migration,
+    google_artifact_registry_repository.mirror,
+    google_artifact_registry_repository_iam_member.cloudrun_pull,
+    google_project_service.services,
   ]
 }
 
@@ -352,6 +355,9 @@ resource "google_cloud_run_v2_service" "backend" {
     google_storage_bucket_iam_member.proxy_config_runtime,
     google_sql_user.app,
     terraform_data.migration,
+    google_artifact_registry_repository.mirror,
+    google_artifact_registry_repository_iam_member.cloudrun_pull,
+    google_project_service.services,
   ]
 }
 
@@ -400,6 +406,12 @@ resource "google_cloud_run_v2_service" "ui" {
       }
     }
   }
+
+  depends_on = [
+    google_artifact_registry_repository.mirror,
+    google_artifact_registry_repository_iam_member.cloudrun_pull,
+    google_project_service.services,
+  ]
 }
 
 # Open Cloud Run's invoker gate so LB traffic reaches the containers. Real auth
@@ -482,5 +494,8 @@ resource "google_cloud_run_v2_job" "migrations" {
   depends_on = [
     google_secret_manager_secret_iam_member.db_url,
     google_sql_user.app,
+    google_artifact_registry_repository.mirror,
+    google_artifact_registry_repository_iam_member.cloudrun_pull,
+    google_project_service.services,
   ]
 }

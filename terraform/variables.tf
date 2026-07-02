@@ -79,11 +79,53 @@ variable "psc_subnet_cidr" {
 }
 
 # ---------- Component images ----------
+#
+# By default the module stands up an Artifact Registry remote repository that
+# mirrors ghcr.io/berriai (see create_image_mirror below) and composes image
+# URIs from it, because Cloud Run cannot pull ghcr.io directly. Set
+# image_registry to bypass the mirror and compose from an explicit prefix, or
+# set the per-component *_image vars for full URIs.
 
 variable "image_registry" {
-  description = "Registry prefix used to compose image URIs as `<image_registry>/litellm-<component>:<image_tag>`. Cloud Run accepts Artifact Registry / gcr.io / docker.io only."
+  description = "Explicit registry prefix used to compose image URIs as `<image_registry>/litellm-<component>:<image_tag>`. Empty (default) uses the built-in Artifact Registry mirror. Cloud Run accepts Artifact Registry / gcr.io / docker.io only."
   type        = string
-  default     = "ghcr.io/berriai"
+  default     = ""
+}
+
+variable "create_image_mirror" {
+  description = "Create an Artifact Registry remote repo that lazily mirrors the upstream images, and compose image URIs from it. Ignored when image_registry is set."
+  type        = bool
+  default     = true
+}
+
+variable "image_mirror_upstream_uri" {
+  description = "Upstream Docker registry the mirror pulls from."
+  type        = string
+  default     = "https://ghcr.io"
+}
+
+variable "image_mirror_upstream_path" {
+  description = "Namespace/org path under the upstream registry (composed as `<mirror>/<path>/litellm-<component>`)."
+  type        = string
+  default     = "berriai"
+}
+
+variable "image_mirror_repository_id" {
+  description = "Artifact Registry repository ID for the mirror. Empty defaults to `<tenant>-litellm-<env>-mirror`."
+  type        = string
+  default     = ""
+}
+
+variable "image_mirror_upstream_username" {
+  description = "Username for a private upstream registry. Only used when image_mirror_credentials_secret_version is set."
+  type        = string
+  default     = ""
+}
+
+variable "image_mirror_credentials_secret_version" {
+  description = "Secret Manager secret *version* name holding the upstream registry password/token (for private upstreams). Empty = anonymous pulls."
+  type        = string
+  default     = ""
 }
 
 variable "image_tag" {

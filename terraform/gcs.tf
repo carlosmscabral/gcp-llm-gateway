@@ -17,6 +17,8 @@ resource "google_storage_bucket" "this" {
   }
 
   labels = local.labels
+
+  depends_on = [google_project_service.services]
 }
 
 resource "google_storage_bucket_iam_member" "runtime" {

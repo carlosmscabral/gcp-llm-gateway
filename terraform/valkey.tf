@@ -28,5 +28,8 @@ resource "google_memorystore_instance" "this" {
 
   labels = local.labels
 
-  depends_on = [google_network_connectivity_service_connection_policy.valkey]
+  depends_on = [
+    google_network_connectivity_service_connection_policy.valkey,
+    google_project_service.services,
+  ]
 }

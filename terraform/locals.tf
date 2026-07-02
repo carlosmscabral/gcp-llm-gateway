@@ -22,10 +22,16 @@ locals {
   valkey_port = try(google_memorystore_instance.this.psc_auto_connections[0].port, 6379)
 
   # ---------- Image URIs ----------
-  gateway_image    = var.gateway_image != "" ? var.gateway_image : "${var.image_registry}/litellm-gateway:${var.image_tag}"
-  backend_image    = var.backend_image != "" ? var.backend_image : "${var.image_registry}/litellm-backend:${var.image_tag}"
-  ui_image         = var.ui_image != "" ? var.ui_image : "${var.image_registry}/litellm-ui:${var.image_tag}"
-  migrations_image = var.migrations_image != "" ? var.migrations_image : "${var.image_registry}/litellm-migrations:${var.image_tag}"
+  # Prefix precedence: explicit image_registry > built-in AR mirror > raw
+  # upstream (last one won't pull on Cloud Run — surfaces the misconfig).
+  image_prefix = var.image_registry != "" ? var.image_registry : (
+    local.image_mirror_enabled ? "${var.region}-docker.pkg.dev/${var.project_id}/${local.mirror_repo_id}/${var.image_mirror_upstream_path}" : "ghcr.io/${var.image_mirror_upstream_path}"
+  )
+
+  gateway_image    = var.gateway_image != "" ? var.gateway_image : "${local.image_prefix}/litellm-gateway:${var.image_tag}"
+  backend_image    = var.backend_image != "" ? var.backend_image : "${local.image_prefix}/litellm-backend:${var.image_tag}"
+  ui_image         = var.ui_image != "" ? var.ui_image : "${local.image_prefix}/litellm-ui:${var.image_tag}"
+  migrations_image = var.migrations_image != "" ? var.migrations_image : "${local.image_prefix}/litellm-migrations:${var.image_tag}"
 
   # ---------- proxy_config (config.yaml) ----------
   proxy_config_enabled    = length(keys(var.proxy_config)) > 0

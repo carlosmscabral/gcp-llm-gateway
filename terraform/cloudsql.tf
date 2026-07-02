@@ -50,6 +50,8 @@ resource "google_sql_database_instance" "this" {
     # forces a destroy/recreate).
     ignore_changes = [settings[0].disk_size]
   }
+
+  depends_on = [google_project_service.services]
 }
 
 resource "google_sql_database" "this" {
@@ -83,6 +85,8 @@ resource "google_secret_manager_secret" "db_url" {
   replication {
     auto {}
   }
+
+  depends_on = [google_project_service.services]
 }
 
 resource "google_secret_manager_secret_version" "db_url" {

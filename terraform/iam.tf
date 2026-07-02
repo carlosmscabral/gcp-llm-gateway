@@ -4,6 +4,8 @@
 resource "google_service_account" "runtime" {
   account_id   = "${local.name}-runtime"
   display_name = "LiteLLM Cloud Run runtime"
+
+  depends_on = [google_project_service.services]
 }
 
 # UI runtime SA — no role bindings. The UI is static nginx with no DB, cache,
@@ -11,6 +13,8 @@ resource "google_service_account" "runtime" {
 resource "google_service_account" "ui_runtime" {
   account_id   = "${local.name}-ui-runtime"
   display_name = "LiteLLM Cloud Run UI runtime (no data-plane access)"
+
+  depends_on = [google_project_service.services]
 }
 
 # Cloud SQL client — required by the native Cloud SQL connector.

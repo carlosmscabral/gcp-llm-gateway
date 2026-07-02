@@ -15,6 +15,8 @@ resource "google_compute_network" "this" {
   name                    = local.name
   auto_create_subnetworks = false
   routing_mode            = "REGIONAL"
+
+  depends_on = [google_project_service.services]
 }
 
 # Main subnet — Cloud Run instances draw Direct VPC egress IPs from here.
@@ -50,4 +52,6 @@ resource "google_network_connectivity_service_connection_policy" "valkey" {
   psc_config {
     subnetworks = [google_compute_subnetwork.psc.id]
   }
+
+  depends_on = [google_project_service.services]
 }

@@ -13,6 +13,8 @@ resource "google_secret_manager_secret" "master_key" {
   replication {
     auto {}
   }
+
+  depends_on = [google_project_service.services]
 }
 
 resource "google_secret_manager_secret_version" "master_key" {
@@ -29,6 +31,8 @@ resource "google_secret_manager_secret" "license" {
   replication {
     auto {}
   }
+
+  depends_on = [google_project_service.services]
 }
 
 resource "google_secret_manager_secret_version" "license" {
@@ -47,6 +51,8 @@ resource "google_secret_manager_secret" "ui_password" {
   replication {
     auto {}
   }
+
+  depends_on = [google_project_service.services]
 }
 
 resource "google_secret_manager_secret_version" "ui_password" {
@@ -65,6 +71,8 @@ resource "google_secret_manager_secret" "otel_config" {
   replication {
     auto {}
   }
+
+  depends_on = [google_project_service.services]
 }
 
 resource "google_secret_manager_secret_version" "otel_config" {
