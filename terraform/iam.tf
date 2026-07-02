@@ -48,6 +48,15 @@ resource "google_project_iam_member" "runtime_vertex" {
   member  = "serviceAccount:${google_service_account.runtime.email}"
 }
 
+# Model Armor: the runtime SA invokes the sanitize APIs via ADC.
+resource "google_project_iam_member" "runtime_modelarmor" {
+  count = var.enable_model_armor ? 1 : 0
+
+  project = var.project_id
+  role    = "roles/modelarmor.user"
+  member  = "serviceAccount:${google_service_account.runtime.email}"
+}
+
 # ---------- Secret accessors ----------
 
 resource "google_secret_manager_secret_iam_member" "master_key" {

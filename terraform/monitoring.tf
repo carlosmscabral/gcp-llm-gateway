@@ -11,7 +11,7 @@ locals {
   mon_sql_id  = "${var.project_id}:${google_sql_database_instance.this.name}"
 
   # Dashboard tiles: title + metric filter + aligners. Laid out 2-wide.
-  mon_tiles = [
+  mon_base_tiles = [
     {
       t = "Gateway — request rate (req/s)"
       f = "resource.type=\"cloud_run_revision\" resource.labels.service_name=\"${local.mon_gateway}\" metric.type=\"run.googleapis.com/request_count\""
@@ -48,6 +48,17 @@ locals {
       a = "ALIGN_MEAN", r = "REDUCE_MEAN"
     },
   ]
+
+  # Model Armor tiles (added only when enabled). Counts per filter; Model Armor
+  # emits no latency metric, so latency is measured client-side (load-test A/B).
+  mon_armor_tiles = var.enable_model_armor ? [
+    { t = "Model Armor — sanitize requests/s", f = "metric.type=\"modelarmor.googleapis.com/template/request_count\"", a = "ALIGN_RATE", r = "REDUCE_SUM" },
+    { t = "Model Armor — prompt-injection/jailbreak", f = "metric.type=\"modelarmor.googleapis.com/template/pi_jb_request_count\"", a = "ALIGN_RATE", r = "REDUCE_SUM" },
+    { t = "Model Armor — sensitive data (SDP)", f = "metric.type=\"modelarmor.googleapis.com/template/sdp_request_count\"", a = "ALIGN_RATE", r = "REDUCE_SUM" },
+    { t = "Model Armor — malicious URI", f = "metric.type=\"modelarmor.googleapis.com/template/malicious_uri_request_count\"", a = "ALIGN_RATE", r = "REDUCE_SUM" },
+  ] : []
+
+  mon_tiles = concat(local.mon_base_tiles, local.mon_armor_tiles)
 
   mon_uptime_host = local.tls_enabled ? local.effective_lb_domains[0] : google_compute_global_address.lb.address
 }

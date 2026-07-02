@@ -26,6 +26,23 @@
       "key_budget": 1000
     },
     {
+      "name": "armored",
+      "enabled": false,
+      "model": "mock-gpt",
+      "executor": "constant-arrival-rate",
+      "rate": 200,
+      "duration": "90s",
+      "preAllocatedVUs": 200,
+      "maxVUs": 3000,
+      "prompt_tokens": 8,
+      "max_tokens": 32,
+      "guardrails": ["model-armor"],
+      "key_models": ["mock-gpt"],
+      "key_rpm": 100000,
+      "key_tpm": 100000000,
+      "key_budget": 1000
+    },
+    {
       "name": "streaming",
       "enabled": true,
       "model": "mock-gpt",

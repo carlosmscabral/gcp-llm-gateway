@@ -481,6 +481,53 @@ variable "otel_collector_image" {
   default     = "us-docker.pkg.dev/cloud-ops-agents-artifacts/google-cloud-opentelemetry-collector/otelcol-google:0.151.0"
 }
 
+# ---------- Model Armor (GCP LLM safety guardrail) ----------
+#
+# Wires LiteLLM's native Google Cloud Model Armor guardrail (prompt-injection /
+# jailbreak, PII/SDP, malicious-URL) authenticated via ADC (the runtime SA).
+# Defaults are measurement-friendly: INSPECT_ONLY (log, don't block) and
+# fail_on_error=false, so you can quantify impact before enforcing.
+
+variable "enable_model_armor" {
+  description = "Create a Model Armor template, grant the runtime SA modelarmor.user, and register the LiteLLM model_armor guardrail."
+  type        = bool
+  default     = false
+}
+
+variable "model_armor_location" {
+  description = "Model Armor region (regional service; e.g. us-central1). Defaults to var.region."
+  type        = string
+  default     = ""
+}
+
+variable "model_armor_template_id" {
+  description = "Existing Model Armor template ID to use. Empty creates one named `<tenant>-litellm-<env>-armor`."
+  type        = string
+  default     = ""
+}
+
+variable "model_armor_enforcement" {
+  description = "INSPECT_ONLY (observe + log, don't block — good for measuring) or INSPECT_AND_BLOCK."
+  type        = string
+  default     = "INSPECT_ONLY"
+  validation {
+    condition     = contains(["INSPECT_ONLY", "INSPECT_AND_BLOCK"], var.model_armor_enforcement)
+    error_message = "model_armor_enforcement must be INSPECT_ONLY or INSPECT_AND_BLOCK."
+  }
+}
+
+variable "model_armor_mode" {
+  description = "When the guardrail runs: any of pre_call (scan prompt), post_call (scan response), during_call. Fewer = less latency."
+  type        = list(string)
+  default     = ["pre_call"]
+}
+
+variable "model_armor_default_on" {
+  description = "true = run Model Armor on EVERY request (100%). false = opt-in per request via `guardrails: [\"model-armor\"]` (client-controlled sampling). LiteLLM has no built-in percentage sampler."
+  type        = bool
+  default     = false
+}
+
 # ---------- Observability (Cloud Monitoring dashboard + alerts + uptime) ----------
 
 variable "enable_monitoring" {

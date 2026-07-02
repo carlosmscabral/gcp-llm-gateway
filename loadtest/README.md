@@ -99,6 +99,19 @@ Built-in profiles: `throughput` (mock, max RPS), `streaming` (mock SSE), `real`
 rejects), `model-acl` (asks for a model the key can't use → rejects), `ramp`
 (disabled; VU ramp to find the knee).
 
+## Measuring Model Armor latency (A/B)
+
+Model Armor emits request/filter **counts** but no latency metric, so measure the
+added latency by comparing two runs on the authoritative Cloud Run p95:
+
+1. Baseline — run only the `throughput` profile (plain), note gateway p95 in `report.md`.
+2. Armored — enable the `armored` profile (same shape + `"guardrails": ["model-armor"]`),
+   disable `throughput`, run, note p95.
+3. Delta ≈ Model Armor pre_call overhead.
+
+Per-request opt-in (`guardrails` in the profile) is also how you "sample" Model
+Armor when `model_armor_default_on = false` — LiteLLM has no percentage sampler.
+
 ## Output
 
 `results/<run-id>/`:

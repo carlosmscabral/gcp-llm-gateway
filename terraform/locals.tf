@@ -53,13 +53,32 @@ locals {
   ] : []
 
   # ---------- proxy_config (config.yaml) ----------
-  # Effective config = user proxy_config with the auto Vertex models prepended
-  # to its model_list. Lets a bare deploy serve Gemini with no proxy_config set.
+  # Effective config = user proxy_config with auto Vertex models prepended to its
+  # model_list and the Model Armor guardrail registered (when enabled). Lets a
+  # bare deploy serve Gemini and enable safety with no proxy_config authoring.
   user_model_list      = try(var.proxy_config.model_list, [])
   effective_model_list = concat(local.vertex_auto_models, local.user_model_list)
-  effective_proxy_config = length(local.effective_model_list) > 0 ? merge(
-    var.proxy_config, { model_list = local.effective_model_list }
-  ) : var.proxy_config
+
+  # LiteLLM Model Armor guardrail (native, ADC auth). default_on=false means
+  # opt-in per request (`guardrails: ["model-armor"]`) — LiteLLM has no % sampler.
+  model_armor_guardrail = var.enable_model_armor ? [{
+    guardrail_name = "model-armor"
+    litellm_params = {
+      guardrail     = "model_armor"
+      mode          = var.model_armor_mode
+      template_id   = local.model_armor_template_id
+      project_id    = var.project_id
+      location      = local.model_armor_location
+      default_on    = var.model_armor_default_on
+      fail_on_error = false
+    }
+  }] : []
+
+  proxy_overrides = merge(
+    length(local.effective_model_list) > 0 ? { model_list = local.effective_model_list } : {},
+    length(local.model_armor_guardrail) > 0 ? { guardrails = concat(try(var.proxy_config.guardrails, []), local.model_armor_guardrail) } : {},
+  )
+  effective_proxy_config = merge(var.proxy_config, local.proxy_overrides)
 
   proxy_config_enabled    = length(keys(local.effective_proxy_config)) > 0
   proxy_config_yaml       = local.proxy_config_enabled ? yamlencode(local.effective_proxy_config) : ""

@@ -65,12 +65,15 @@ export function runProfile() {
   const name = exec.scenario.name;
   const p = profilesByName[name];
   const url = `${cfg.base_url}/v1/chat/completions`;
-  const payload = JSON.stringify({
+  const body = {
     model: p.model,
     messages: [{ role: 'user', content: makePrompt(p.prompt_tokens) }],
     stream: !!p.stream,
     max_tokens: p.max_tokens || 32,
-  });
+  };
+  // Per-request guardrail opt-in (e.g. ["model-armor"]) for A/B latency tests.
+  if (p.guardrails) body.guardrails = p.guardrails;
+  const payload = JSON.stringify(body);
   const params = {
     headers: { Authorization: `Bearer ${p.key}`, 'Content-Type': 'application/json' },
     tags: { profile: name, model: p.model },
