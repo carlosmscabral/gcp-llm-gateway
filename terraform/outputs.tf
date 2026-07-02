@@ -3,6 +3,11 @@ output "project_id" {
   value       = var.project_id
 }
 
+output "region" {
+  description = "GCP region the stack is deployed to."
+  value       = var.region
+}
+
 output "lb_ip" {
   description = "Global anycast IP of the external HTTPS load balancer."
   value       = google_compute_global_address.lb.address
@@ -51,6 +56,21 @@ output "master_key_secret_id" {
 output "db_url_secret_id" {
   description = "Secret Manager resource ID holding the full DATABASE_URL (unix-socket form)."
   value       = google_secret_manager_secret.db_url.secret_id
+}
+
+output "loadtest_job_name" {
+  description = "Name of the k6 load-test Cloud Run Job (empty unless enable_loadtest)."
+  value       = var.enable_loadtest ? google_cloud_run_v2_job.loadtest[0].name : ""
+}
+
+output "loadtest_results_bucket" {
+  description = "GCS bucket holding load-test config + k6 summaries (empty unless enable_loadtest)."
+  value       = var.enable_loadtest ? google_storage_bucket.loadtest[0].name : ""
+}
+
+output "loadtest_ar_repo" {
+  description = "STANDARD Artifact Registry repo hosting the k6 image (empty unless enable_loadtest)."
+  value       = var.enable_loadtest ? google_artifact_registry_repository.loadtest[0].repository_id : ""
 }
 
 output "migration_run_command" {

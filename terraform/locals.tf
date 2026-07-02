@@ -28,6 +28,10 @@ locals {
     local.image_mirror_enabled ? "${var.region}-docker.pkg.dev/${var.project_id}/${local.mirror_repo_id}/${var.image_mirror_upstream_path}" : "ghcr.io/${var.image_mirror_upstream_path}"
   )
 
+  # Load-test k6 image, hosted in the STANDARD load-test AR repo (not the ghcr mirror).
+  loadtest_repo_id = "${local.name}-loadtest"
+  k6_image         = var.k6_image != "" ? var.k6_image : "${var.region}-docker.pkg.dev/${var.project_id}/${local.loadtest_repo_id}/k6:latest"
+
   gateway_image    = var.gateway_image != "" ? var.gateway_image : "${local.image_prefix}/litellm-gateway:${var.image_tag}"
   backend_image    = var.backend_image != "" ? var.backend_image : "${local.image_prefix}/litellm-backend:${var.image_tag}"
   ui_image         = var.ui_image != "" ? var.ui_image : "${local.image_prefix}/litellm-ui:${var.image_tag}"

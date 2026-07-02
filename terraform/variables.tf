@@ -480,3 +480,40 @@ variable "otel_collector_image" {
   type        = string
   default     = "us-docker.pkg.dev/cloud-ops-agents-artifacts/google-cloud-opentelemetry-collector/otelcol-google:0.151.0"
 }
+
+# ---------- Load / stress test harness (gated; off by default) ----------
+#
+# When enabled, the module creates a STANDARD Artifact Registry repo (to host a
+# custom k6 image — the ghcr mirror is pull-through/read-only), a private results
+# bucket, a dedicated least-privilege SA, and a k6 Cloud Run Job. Nothing here is
+# created on a normal deploy. See loadtest/ for the runner scripts.
+
+variable "enable_loadtest" {
+  description = "Create the load-test harness resources (Artifact Registry repo, results bucket, SA, k6 Cloud Run Job). Off by default."
+  type        = bool
+  default     = false
+}
+
+variable "k6_image" {
+  description = "Full k6 image URI for the load-test Job. Empty composes from the STANDARD load-test AR repo as `<region>-docker.pkg.dev/<project>/<name>-loadtest/k6:latest` (built by loadtest/run.sh)."
+  type        = string
+  default     = ""
+}
+
+variable "loadtest_cpu" {
+  description = "CPU per k6 Cloud Run Job task."
+  type        = string
+  default     = "2000m"
+}
+
+variable "loadtest_memory" {
+  description = "Memory per k6 Cloud Run Job task."
+  type        = string
+  default     = "2Gi"
+}
+
+variable "loadtest_task_timeout" {
+  description = "Max duration for a single k6 task (must exceed your test duration + ramp)."
+  type        = string
+  default     = "3600s"
+}

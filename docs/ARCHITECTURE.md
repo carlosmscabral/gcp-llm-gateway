@@ -230,28 +230,28 @@ What a `POST /v1/chat/completions` touches, end to end:
 sequenceDiagram
   autonumber
   participant C as Client
-  participant LB as HTTPS LB (TLS)
-  participant GW as gateway (app)
+  participant LB as HTTPS LB
+  participant GW as Gateway app
   participant VK as Valkey
   participant PG as Cloud SQL
   participant VX as Vertex AI
   participant OT as OTel sidecar
 
-  Note over GW: secrets (master key, DATABASE_URL) loaded at boot from Secret Manager
-  C->>LB: POST /v1/chat/completions (Bearer sk-…, model=gemini-3.5-flash)
-  LB->>GW: route /v1/chat/* → gateway serverless NEG
-  GW->>VK: look up key in cache; check tpm/rpm counters
+  Note over GW: secrets loaded at boot from Secret Manager
+  C->>LB: POST /v1/chat/completions with Bearer key
+  LB->>GW: route data-plane path to gateway NEG
+  GW->>VK: look up key in cache, check tpm and rpm counters
   alt key not cached
-    GW->>PG: validate key (LiteLLM_VerificationTokenTable):<br/>blocked? expired? budget? model allowed?
-    PG-->>GW: key metadata (cached back into Valkey)
+    GW->>PG: validate key in LiteLLM_VerificationTokenTable
+    PG-->>GW: key metadata, cached back into Valkey
   end
-  GW->>VK: Router: pick a deployment for model_name,<br/>skip any in cooldown
-  GW->>VX: chat request via ADC (runtime SA)
-  VX-->>GW: completion + token usage
-  GW->>PG: record spend/usage (async)
-  GW->>VK: update tpm/rpm usage + cooldown state
-  GW--)OT: emit span (OTLP localhost:4318) → Cloud Trace/Monitoring
-  GW-->>C: 200 + completion
+  GW->>VK: router picks a deployment, skips cooled-down ones
+  GW->>VX: chat request via ADC runtime SA
+  VX-->>GW: completion and token usage
+  GW->>PG: record spend and usage async
+  GW->>VK: update tpm and rpm usage and cooldown state
+  GW-)OT: emit span via OTLP to Cloud Trace and Monitoring
+  GW-->>C: 200 and completion
 ```
 
 Step notes (grounded in LiteLLM docs):
@@ -512,20 +512,20 @@ flowchart TB
 sequenceDiagram
   autonumber
   participant TF as terraform apply
-  participant API as google_project_service
-  participant INF as VPC · Cloud SQL · Valkey(PSC) · Secret Mgr · AR mirror
+  participant API as project services
+  participant INF as VPC Cloud SQL Valkey Secrets mirror
   participant MIG as migrations Job
-  participant SVC as gateway / backend / ui
-  participant LB as LB + managed cert
+  participant SVC as gateway backend ui
+  participant LB as LB and managed cert
 
   TF->>API: enable required APIs
-  TF->>INF: create infra (IP reserved here)
-  TF->>MIG: create Job; local-exec runs `prisma migrate deploy --wait`
+  TF->>INF: create infra and reserve the static IP
+  TF->>MIG: create Job then run prisma migrate deploy and wait
   MIG-->>TF: schema applied
-  TF->>SVC: create services (depends_on migration)
-  Note over SVC: pull images via mirror; app waits for collector (container-dependencies)
+  TF->>SVC: create services after the migration
+  Note over SVC: pull images via mirror, app waits for collector
   TF->>LB: NEGs, backend services, URL map, forwarding rules
-  Note over LB: nip.io cert PROVISIONING → ACTIVE (~10–15 min, async)
+  Note over LB: nip.io cert provisions to ACTIVE async, roughly 10 to 15 minutes
 ```
 
 Ordering guarantees: services `depend_on terraform_data.migration`, so they never

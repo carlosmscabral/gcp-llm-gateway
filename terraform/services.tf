@@ -22,8 +22,12 @@ locals {
     "iam.googleapis.com",
   ]
 
-  # Vertex AI API added only when the gateway will call Vertex models.
-  required_apis = concat(local.base_apis, var.enable_vertex_ai ? ["aiplatform.googleapis.com"] : [])
+  # Optional APIs, added only when the corresponding feature is enabled.
+  required_apis = concat(
+    local.base_apis,
+    var.enable_vertex_ai ? ["aiplatform.googleapis.com"] : [],
+    var.enable_loadtest ? ["cloudbuild.googleapis.com"] : [],
+  )
 }
 
 resource "google_project_service" "services" {

@@ -1,0 +1,122 @@
+{
+  "_comment": "Load-test scale + profiles. Edit and re-run `./run.sh all`. `tasks` = Cloud Run Job parallel tasks; per-profile `rate` is TOTAL rps across all tasks (k6 execution segments split it). Each enabled profile gets its own virtual key minted from key_* fields. See README.md.",
+
+  "tasks": 4,
+
+  "thresholds": {
+    "http_req_failed": ["rate<0.60"],
+    "http_req_duration": ["p(95)<8000"]
+  },
+
+  "profiles": [
+    {
+      "name": "throughput",
+      "enabled": true,
+      "model": "mock-gpt",
+      "executor": "constant-arrival-rate",
+      "rate": 200,
+      "duration": "90s",
+      "preAllocatedVUs": 200,
+      "maxVUs": 3000,
+      "prompt_tokens": 8,
+      "max_tokens": 32,
+      "key_models": ["mock-gpt"],
+      "key_rpm": 100000,
+      "key_tpm": 100000000,
+      "key_budget": 1000
+    },
+    {
+      "name": "streaming",
+      "enabled": true,
+      "model": "mock-gpt",
+      "stream": true,
+      "executor": "constant-arrival-rate",
+      "rate": 50,
+      "duration": "90s",
+      "preAllocatedVUs": 100,
+      "maxVUs": 1000,
+      "key_models": ["mock-gpt"],
+      "key_rpm": 100000,
+      "key_tpm": 100000000,
+      "key_budget": 1000
+    },
+    {
+      "name": "real",
+      "enabled": true,
+      "model": "gemini-3.5-flash",
+      "executor": "constant-arrival-rate",
+      "rate": 3,
+      "duration": "90s",
+      "preAllocatedVUs": 20,
+      "maxVUs": 100,
+      "prompt_tokens": 8,
+      "max_tokens": 32,
+      "key_models": ["gemini-3.5-flash"],
+      "key_rpm": 100000,
+      "key_tpm": 100000000,
+      "key_budget": 50
+    },
+    {
+      "name": "ratelimit",
+      "enabled": true,
+      "model": "mock-gpt",
+      "executor": "constant-arrival-rate",
+      "rate": 50,
+      "duration": "60s",
+      "preAllocatedVUs": 50,
+      "maxVUs": 500,
+      "expect_status": 429,
+      "key_models": ["mock-gpt"],
+      "key_rpm": 30,
+      "key_tpm": 100000000,
+      "key_budget": 1000
+    },
+    {
+      "name": "budget",
+      "enabled": true,
+      "model": "gemini-3.5-flash",
+      "executor": "constant-arrival-rate",
+      "rate": 2,
+      "duration": "60s",
+      "preAllocatedVUs": 10,
+      "maxVUs": 50,
+      "expect_status": 400,
+      "key_models": ["gemini-3.5-flash"],
+      "key_rpm": 100000,
+      "key_tpm": 100000000,
+      "key_budget": 0.0000001
+    },
+    {
+      "name": "model-acl",
+      "enabled": true,
+      "model": "gemini-3.5-flash",
+      "executor": "constant-arrival-rate",
+      "rate": 20,
+      "duration": "60s",
+      "preAllocatedVUs": 20,
+      "maxVUs": 200,
+      "expect_status": 400,
+      "key_models": ["mock-gpt"],
+      "key_rpm": 100000,
+      "key_tpm": 100000000,
+      "key_budget": 1000
+    },
+    {
+      "name": "ramp",
+      "enabled": false,
+      "model": "mock-gpt",
+      "executor": "ramping-vus",
+      "startVUs": 0,
+      "stages": [
+        { "duration": "30s", "target": 100 },
+        { "duration": "60s", "target": 500 },
+        { "duration": "30s", "target": 0 }
+      ],
+      "prompt_tokens": 8,
+      "key_models": ["mock-gpt"],
+      "key_rpm": 100000,
+      "key_tpm": 100000000,
+      "key_budget": 1000
+    }
+  ]
+}
