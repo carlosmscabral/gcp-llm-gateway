@@ -190,9 +190,9 @@ variable "gateway_min_instances" {
 }
 
 variable "gateway_max_instances" {
-  description = "Upper bound on gateway Cloud Run instances."
+  description = "Upper bound on gateway Cloud Run instances. A gateway is I/O-bound, so scale horizontally (Cloud Run bills per running instance and scales back to min when idle)."
   type        = number
-  default     = 10
+  default     = 50
 }
 
 variable "gateway_max_instance_request_concurrency" {
@@ -220,9 +220,9 @@ variable "backend_min_instances" {
 }
 
 variable "backend_max_instances" {
-  description = "Upper bound on backend Cloud Run instances."
+  description = "Upper bound on backend Cloud Run instances (management/control plane)."
   type        = number
-  default     = 4
+  default     = 10
 }
 
 variable "backend_max_instance_request_concurrency" {
