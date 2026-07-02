@@ -46,6 +46,26 @@ Observability: traces land in **Cloud Trace**, metrics in **Cloud Monitoring**
 terraform test        # plan-mode assertions with mocked providers (no cloud calls)
 ```
 
+## Known follow-up: LiteLLM OTEL emission
+
+The GCP telemetry pipeline is verified working — the Google-built OTel Collector
+sidecar runs on gateway + backend, receives OTLP on `localhost:4317/4318`, and
+exports traces to **Cloud Trace** and metrics to **Cloud Monitoring** with the
+correct IAM (`roles/cloudtrace.agent`, `roles/monitoring.metricWriter`).
+
+However, the split `litellm-gateway:v1.86.0-dev` staging image does **not emit
+any OTLP** despite the documented config (`LITELLM_OTEL_V2=true`,
+`OTEL_EXPORTER=otlp_http`, `OTEL_ENDPOINT=http://localhost:4318`) — its startup
+logs show no OpenTelemetry initialization. This is an application/image-version
+issue, not an infra one. To resolve, try (in order):
+
+1. A stable LiteLLM release tag instead of `-dev` (`image_tag`).
+2. Adding standard OTel SDK env vars via `gateway_extra_env` / `backend_extra_env`:
+   `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`, `OTEL_TRACES_EXPORTER=otlp`.
+3. The non-split `litellm` image.
+
+The moment LiteLLM sends spans, they will flow to Cloud Trace with no infra change.
+
 ## GCP Developer Knowledge MCP
 
 This repo ships an `.mcp.json` for the Google Developer Knowledge MCP server.
