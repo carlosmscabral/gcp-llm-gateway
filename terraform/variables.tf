@@ -481,6 +481,32 @@ variable "otel_collector_image" {
   default     = "us-docker.pkg.dev/cloud-ops-agents-artifacts/google-cloud-opentelemetry-collector/otelcol-google:0.151.0"
 }
 
+# ---------- Observability (Cloud Monitoring dashboard + alerts + uptime) ----------
+
+variable "enable_monitoring" {
+  description = "Create a Cloud Monitoring dashboard, alert policies, and an uptime check for the gateway (uses GCP-native metrics; no app changes)."
+  type        = bool
+  default     = true
+}
+
+variable "alert_notification_channels" {
+  description = "Notification channel IDs to attach to alert policies (projects/<p>/notificationChannels/<id>). Empty creates policies that don't notify."
+  type        = list(string)
+  default     = []
+}
+
+variable "gateway_latency_p95_alert_ms" {
+  description = "Alert when gateway request p95 latency exceeds this many milliseconds."
+  type        = number
+  default     = 8000
+}
+
+variable "sql_connections_alert" {
+  description = "Alert when Cloud SQL active connections exceed this count (fan-out ceiling)."
+  type        = number
+  default     = 150
+}
+
 # ---------- Load / stress test harness (gated; off by default) ----------
 #
 # When enabled, the module creates a STANDARD Artifact Registry repo (to host a
