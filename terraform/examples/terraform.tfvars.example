@@ -10,7 +10,7 @@ env        = "dev"
 # point image_registry at an Artifact Registry remote repo mirroring ghcr.io,
 # or set the four *_image URIs explicitly.
 # image_registry = "us-central1-docker.pkg.dev/gcp-llm-gateway-cabral/litellm/berriai"
-# image_tag      = "v1.86.0-dev"
+# image_tag      = "v1.89.2"   # default; use a stable release tag
 
 # Cheapest footprint for a test stack.
 db_availability_type         = "ZONAL"

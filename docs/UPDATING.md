@@ -25,7 +25,8 @@ The images are pulled through the Artifact Registry **remote mirror** of
 `ghcr.io/berriai` (created by the module), so nothing is pushed by hand.
 
 Relevant files/vars:
-- `image_tag` (default `v1.86.0-dev`) and `image_registry` — `variables.tf`
+- `image_tag` (default `v1.89.2` — the verified baseline; prefer stable release
+  tags over `-dev`) and `image_registry` — `variables.tf`
 - per-component overrides: `gateway_image`, `backend_image`, `ui_image`,
   `migrations_image`
 - migration trigger: `bootstrap.tf` → `terraform_data.migration`

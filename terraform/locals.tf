@@ -114,6 +114,8 @@ locals {
     { name = "OTEL_ENDPOINT", value = local.otel_local_endpoint },
     { name = "OTEL_ENVIRONMENT_NAME", value = local.otel_environment_name },
     { name = "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", value = var.otel_capture_message_content },
+    # Emit the nested litellm_request span (off by default since LiteLLM v1.81).
+    { name = "USE_OTEL_LITELLM_REQUEST_SPAN", value = "true" },
   ]
   gateway_otel_env_kv_raw = concat(local.otel_shared_env_kv, [
     { name = "OTEL_SERVICE_NAME", value = "${local.name}-gateway" },

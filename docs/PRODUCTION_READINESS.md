@@ -369,9 +369,11 @@ plan lets spend track the actual availability/throughput requirement.
 
 ## 9. Open items carried from the current build
 
-- **LiteLLM OTEL emission** — collector + GCP export verified healthy, but the
-  `litellm-gateway:v1.86.0-dev` image emits no spans. Resolve (stable tag /
-  standard OTel SDK env vars / non-split image) as part of Phase 1 observability.
+- **LiteLLM OTEL emission — resolved on `v1.89.2`** (now the default image_tag; the
+  old `v1.86.0-dev` didn't emit). Per-request traces flow to Cloud Trace via the
+  collector sidecar. Remaining nicety: the LiteLLM trace isn't joined with the
+  Cloud Run/LB platform trace (needs Google trace-context propagation — see
+  [`LIMITATIONS.md`](./LIMITATIONS.md) / upstream #22762).
 
 See [`DESIGN_DECISIONS.md`](./DESIGN_DECISIONS.md) for why each current choice was
 made and its explicit production upgrade path.
