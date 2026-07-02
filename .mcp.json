@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "gcp-developer-knowledge": {
+      "type": "http",
+      "url": "https://developerknowledge.googleapis.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${GCP_ACCESS_TOKEN}",
+        "x-goog-user-project": "gcp-llm-gateway-cabral"
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+# Copy to a *.tfvars file and fill in. Keep real secrets out of VCS — prefer
+# TF_VAR_litellm_master_key / TF_VAR_litellm_license env vars for those.
+
+project_id = "gcp-llm-gateway-cabral"
+region     = "us-central1"
+tenant     = "acme"
+env        = "dev"
+
+# LiteLLM images live on GHCR, which Cloud Run cannot pull directly. Either
+# point image_registry at an Artifact Registry remote repo mirroring ghcr.io,
+# or set the four *_image URIs explicitly.
+# image_registry = "us-central1-docker.pkg.dev/gcp-llm-gateway-cabral/litellm/berriai"
+# image_tag      = "v1.86.0-dev"
+
+# Cheapest footprint for a test stack.
+db_availability_type         = "ZONAL"
+cloudsql_deletion_protection = false
+valkey_deletion_protection   = false
+gcs_force_destroy            = true
+
+# TLS is on by default via nip.io (<lb-ip>.nip.io) — no DNS setup needed.
+# Bring your own domain instead by listing it here (point it at the lb_ip output):
+#   lb_domains = ["gw.example.com"]
+# Or force HTTP-only for a quick trial:
+#   allow_plaintext_lb = true
+lb_domains = []
+
+# Vertex AI "easy button" (defaults shown). The module enables the API, grants
+# the runtime SA roles/aiplatform.user, and auto-registers these Gemini models
+# against this project/region — LiteLLM calls them keyless via ADC.
+enable_vertex_ai     = true
+vertex_gemini_models = ["gemini-3.5-flash", "gemini-3.1-pro-preview"]
+# vertex_location    = "global"   # default; set a region (e.g. us-central1) for locality
