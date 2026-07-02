@@ -130,7 +130,40 @@ gcloud secrets versions access latest \
 - **Traces/metrics:** Cloud Trace + Cloud Monitoring (once LiteLLM emits — see
   the follow-up note at the end)
 
-## 1.5 Tear down
+## 1.5 TLS and the endpoint URL
+
+TLS is **on by default with no DNS setup**. The module reserves a static LB IP,
+derives the hostname **`<lb-ip>.nip.io`** from it (nip.io resolves that name back
+to the IP), and provisions a **Google-managed certificate** for it. `terraform
+output lb_url` gives you the URL, e.g. `https://8.228.234.166.nip.io`.
+
+Because the hostname is derived from the Terraform-managed IP, a **fresh apply
+needs no prior knowledge of the address** — Terraform reserves the IP, then
+builds the domain and cert from it, in order, in one apply.
+
+One consequence of Google-managed certs: they provision **asynchronously**. The
+`apply` returns while the cert is still `PROVISIONING` (~10–15 min). During that
+window HTTPS (443) isn't serving yet and port 80 redirects to it, so requests
+fail until the cert is `ACTIVE`. Watch it:
+
+```bash
+gcloud compute ssl-certificates list --project="$(terraform output -raw project_id)" \
+  --format="table(name,managed.status,managed.domainStatus)"
+# wait until MANAGED_STATUS = ACTIVE, then:
+./examples/smoke-test.sh
+```
+
+**Options:**
+- **Bring your own domain:** set `lb_domains = ["gw.example.com"]` and point a DNS
+  A record at the `lb_ip` output. These override nip.io.
+- **HTTP-only (quick trial):** set `allow_plaintext_lb = true` — no cert, serves
+  plain HTTP on the IP (`lb_url` becomes `http://<ip>`).
+
+> nip.io is a public convenience DNS service — great for dev, **not for
+> production**. For prod use your own domain (and add Cloud Armor + an SSL policy
+> — see [`../docs/PRODUCTION_READINESS.md`](../docs/PRODUCTION_READINESS.md) §4.4).
+
+## 1.6 Tear down
 
 ```bash
 terraform destroy -var-file=dev.tfvars

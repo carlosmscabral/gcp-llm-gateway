@@ -8,7 +8,15 @@
 # override nip.io. Set var.allow_plaintext_lb = true to fall back to HTTP-only.
 
 locals {
-  # nip.io hostname derived from the reserved LB IP (no DNS records needed).
+  # nip.io hostname derived from the LB's reserved static IP — no DNS records,
+  # and crucially no need to know the IP up front. Referencing
+  # google_compute_global_address.lb.address here creates an implicit
+  # dependency, so on a fresh apply Terraform: (1) reserves the static IP,
+  # (2) derives <ip>.nip.io from it, (3) issues the managed cert for that name —
+  # all in a single apply, in the right order. `length()` of the resulting
+  # one-element list is known at plan time, so the count-gated TLS resources
+  # below plan cleanly even while the IP value itself is still "known after
+  # apply". (The cert then provisions asynchronously — ~10-15 min to ACTIVE.)
   nip_io_domain = "${google_compute_global_address.lb.address}.nip.io"
 
   # Domain precedence: customer domains > nip.io (unless plaintext opt-out).
