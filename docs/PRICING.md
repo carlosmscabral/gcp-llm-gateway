@@ -26,13 +26,13 @@ and a month is **730 hours**.
 
 ```
    Monthly cost  ≈   FIXED FLOOR   +   VARIABLE (per traffic)   +   MODEL ARMOR (if on)
-                     ~$250/mo          scales with requests,        scales with tokens
+                     ≈$250/mo          scales with requests,        scales with tokens
                      (always on)       tokens, and duration         (input tokens)
 ```
 
-- There is a **~$250/month floor** with the ZONAL dev-style defaults, paid whether
-  or not a single request arrives. It is dominated by **Cloud SQL** (~$104) and the
-  three **always-warm Cloud Run** services (~$95).
+- There is a **≈$250/month floor** with the ZONAL dev-style defaults, paid whether
+  or not a single request arrives. It is dominated by **Cloud SQL** (≈$104) and the
+  three **always-warm Cloud Run** services (≈$95).
 - On top of the floor, cost scales with **requests**, **tokens**, and **request
   duration**.
 - **Model Armor is the most traffic-sensitive line** — at high volume it can exceed
@@ -50,22 +50,22 @@ and a month is **730 hours**.
 | Cloud Run requests | $0.40 / million | 2,000,000 / mo |
 | Cloud SQL vCPU (Enterprise) | $0.0413 / vCPU-hour | — |
 | Cloud SQL memory (Enterprise) | $0.0070 / GB-hour | — |
-| Cloud SQL SSD storage | ~$0.17 / GB-month | — |
-| Memorystore Valkey `shared-core-nano` | **premise** ~$0.02 / node-hour (see §5) | — |
+| Cloud SQL SSD storage | ≈$0.17 / GB-month | — |
+| Memorystore Valkey `shared-core-nano` | **premise** ≈$0.02 / node-hour (see §5) | — |
 | HTTPS LB global forwarding rule | $0.025 / hour (first 5) | — |
-| HTTPS LB data processing | ~$0.01 / GiB (in + out) | — |
-| Internet egress (to internet) | ~$0.12 / GiB (first tier; premise) | — |
+| HTTPS LB data processing | ≈$0.01 / GiB (in + out) | — |
+| Internet egress (to internet) | ≈$0.12 / GiB (first tier; premise) | — |
 | Artifact Registry storage | $0.10 / GB-month | 0.5 GB |
 | Secret Manager active version | $0.06 / version-month | 6 versions |
-| Cloud Trace span ingestion | ~$0.20 / million spans | 2.5M spans / mo |
+| Cloud Trace span ingestion | ≈$0.20 / million spans | 2.5M spans / mo |
 | Cloud Monitoring — Google system metrics | free (non-chargeable) | — |
 | Managed Prometheus samples (collector metrics) | $0.060 / million samples | — |
 | Model Armor | $0.10 / million tokens | 2,000,000 tokens / mo |
 
 Sources in §8. The Cloud Run **idle** rate is the reduced min-instance rate
-(~90% off active CPU); memory is the same rate active or idle. Cloud Monitoring
+(≈90% off active CPU); memory is the same rate active or idle. Cloud Monitoring
 alerting is free today but [begins charging no sooner than Sept 1, 2026](https://cloud.google.com/products/observability/pricing)
-(~$0.35 per policy-month) — with 3 alert policies that is ~$1/mo, noted but excluded.
+(≈$0.35 per policy-month) — with 3 alert policies that is ≈$1/mo, noted but excluded.
 
 ---
 
@@ -81,18 +81,18 @@ Valkey nano; TLS load balancer = 2 forwarding rules).
 | Cloud SQL compute (2 vCPU) | 2 × $0.0413 × 730 | $60.30 |
 | Cloud SQL memory (7.5 GB) | 7.5 × $0.0070 × 730 | $38.33 |
 | Cloud SQL SSD (20 GB) | 20 × $0.17 | $3.40 |
-| Cloud SQL backups + PITR | premise | ~$2.00 |
+| Cloud SQL backups + PITR | premise | ≈$2.00 |
 | Cloud Run idle CPU (5 vCPU total) | 5 × $0.0000025 × 2,628,000 | $32.85 |
 | Cloud Run idle memory (9.5 GiB total) | 9.5 × $0.0000025 × 2,628,000 | $62.42 |
-| Memorystore Valkey (nano) | premise ~$0.02 × 730 | ~$15.00 |
+| Memorystore Valkey (nano) | premise ≈$0.02 × 730 | ≈$15.00 |
 | HTTPS LB forwarding rules (2) | 2 × $0.025 × 730 | $36.50 |
-| Artifact Registry (mirror cache ~5 GB) | ~5 × $0.10 | ~$0.50 |
+| Artifact Registry (mirror cache ≈5 GB) | ≈5 × $0.10 | ≈$0.50 |
 | Secret Manager (few versions) | near free tier | <$1.00 |
 | **Fixed floor** | | **≈ $252 / month** |
 
-The two big levers on the floor: **Cloud SQL** (~$104; halve by dropping to
+The two big levers on the floor: **Cloud SQL** (≈$104; halve by dropping to
 `db-custom-1-3840` if the workload allows, or roughly **double** it by choosing
-REGIONAL HA) and the **4 GiB memory on gateway/backend** (that alone is ~$26/mo of
+REGIONAL HA) and the **4 GiB memory on gateway/backend** (that alone is ≈$26/mo of
 idle memory; dropping to 2 GiB cuts it in half — see §6).
 
 ---
@@ -102,10 +102,10 @@ idle memory; dropping to 2 GiB cuts it in half — see §6).
 Three illustrative profiles. Token mix is **25% input / 75% output** (Gemini), as
 requested. Premises for the variable math:
 
-- **Request duration / packing:** each request holds a gateway instance for ~**4 s**
-  of wall time; effective concurrency ~**10** per instance → ~**0.4 billed
+- **Request duration / packing:** each request holds a gateway instance for ≈**4 s**
+  of wall time; effective concurrency ≈**10** per instance → ≈**0.4 billed
   instance-seconds/request** across the gateway's 2 vCPU + 4.5 GiB (app + sidecar).
-- **Wire size:** ~**6 bytes/token** (≈4 bytes/token + JSON/SSE overhead).
+- **Wire size:** ≈**6 bytes/token** (≈4 bytes/token + JSON/SSE overhead).
 - **Spans:** **8 per request** (the nested app trace).
 - **Model Armor:** `INSPECT_ONLY`, `pre_call` only → inspects **input tokens only**
   (25% of total).
@@ -122,10 +122,10 @@ requested. Premises for the variable math:
 |---|--:|--:|--:|
 | Cloud Run active compute | $0 (free tier) | $65.88 | $705.78 |
 | Cloud Run request fee | $0 (free tier) | $0.40 | $11.20 |
-| LB data processing | ~$0.01 | $0.27 | $3.60 |
-| Internet egress | ~$0.07 | $3.24 | $43.20 |
+| LB data processing | ≈$0.01 | $0.27 | $3.60 |
+| Internet egress | ≈$0.07 | $3.24 | $43.20 |
 | Cloud Trace spans | $0 (free tier) | $4.30 | $47.50 |
-| Cloud Monitoring samples | ~$1 (premise) | ~$8 (premise) | ~$25 (premise) |
+| Cloud Monitoring samples | ≈$1 (premise) | ≈$8 (premise) | ≈$25 (premise) |
 | **Variable subtotal** | **≈ $1** | **≈ $82** | **≈ $836** |
 
 ### Totals
@@ -140,7 +140,7 @@ requested. Premises for the variable math:
 
 Reading it: at **Light** volume almost everything falls inside GCP free tiers, so
 you essentially pay the **floor**. At **Heavy** volume the **Cloud Run active
-compute** (~$706) and **Model Armor** (~$1,500) dominate.
+compute** (≈$706) and **Model Armor** (≈$1,500) dominate.
 
 ---
 
@@ -161,12 +161,12 @@ Because it scales linearly with tokens and has no percentage sampler in LiteLLM,
 Model Armor is the **first thing to scope deliberately**: keep it **off by default**
 (`model_armor_default_on = false`) and opt in per-request (`guardrails:
 ["model-armor"]`) for only the traffic that needs screening, or reserve it for
-untrusted/end-user surfaces. (Model Armor also adds ~+150 ms p50 / ~+330 ms p95 of
+untrusted/end-user surfaces. (Model Armor also adds ≈+150 ms p50 / ≈+330 ms p95 of
 latency — see [`LIMITATIONS.md`](./LIMITATIONS.md).)
 
 > The exact `shared-core-nano` Valkey rate isn't published in a machine-readable
 > form (the pricing page uses a region selector); §3 uses a **premise of
-> ~$0.02/node-hour (~$15/mo)**. It's a dev/test node (1.12 GB, no SLA) and a small
+> ≈$0.02/node-hour (≈$15/mo)**. It's a dev/test node (1.12 GB, no SLA) and a small
 > slice of the floor — confirm on the pricing page and, for production, price a
 > larger node type.
 
@@ -176,14 +176,14 @@ latency — see [`LIMITATIONS.md`](./LIMITATIONS.md).)
 
 | Lever | Effect |
 |---|--:|
-| **Right-size gateway/backend memory** 4 GiB → 2 GiB | −~$26/mo idle + lower active memory |
-| **UI `min_instances = 0`** (accept a cold start) | −~$7/mo floor |
-| **Backend `min_instances = 0`** (control-plane, bursty) | −~$43/mo floor |
-| **Cloud SQL** `db-custom-1-3840` instead of `-2-7680` | ~halve the ~$99 SQL compute |
+| **Right-size gateway/backend memory** 4 GiB → 2 GiB | −≈$26/mo idle + lower active memory |
+| **UI `min_instances = 0`** (accept a cold start) | −≈$7/mo floor |
+| **Backend `min_instances = 0`** (control-plane, bursty) | −≈$43/mo floor |
+| **Cloud SQL** `db-custom-1-3840` instead of `-2-7680` | ≈halve the ≈$99 SQL compute |
 | **Stay ZONAL** (default) vs REGIONAL HA | REGIONAL ≈ **2×** SQL compute + storage |
-| **Cloud Trace sampling** (1-in-N) | cuts span cost ~linearly at Heavy scale |
+| **Cloud Trace sampling** (1-in-N) | cuts span cost ≈linearly at Heavy scale |
 | **Model Armor** off-by-default + per-request opt-in, `pre_call` only | avoids the largest variable line |
-| **Committed Use Discounts** (1–3 yr) on Cloud Run / Cloud SQL | ~25–52% off steady-state compute |
+| **Committed Use Discounts** (1–3 yr) on Cloud Run / Cloud SQL | ≈25–52% off steady-state compute |
 | **CPU always-allocated** (prod streaming) | *raises* cost — trade for lower tail latency |
 
 ---
