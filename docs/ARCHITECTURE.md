@@ -68,6 +68,7 @@ flowchart TB
     ar[Artifact Registry<br/>remote mirror → ghcr.io]
     obs[Cloud Trace + Cloud Monitoring]
     vertex([Vertex AI])
+    ma[Model Armor API<br/>optional guardrail, gated]
   end
 
   client --> lb
@@ -83,6 +84,7 @@ flowchart TB
   gw & be --> gcs
   gw & be -->|OTLP localhost| obs
   gw & be -->|ADC| vertex
+  gw & be -.optional pre_call ADC.-> ma
   job -->|unix socket /cloudsql| sql
   run -.image pull.-> ar
 ```
@@ -107,7 +109,8 @@ ASCII overview (⚠ = single point of failure in the simplified build):
         │CloudSQL│  │Valkey │  │SecretMgr  │   ⚠ single instance / single node
         │Postgres│  │(cache)│  │(secrets)  │
         └────────┘  └───────┘  └───────────┘
-   egress → Vertex AI (ADC, keyless) · OTLP → Cloud Trace/Monitoring
+   egress → Vertex AI (ADC, keyless) · Model Armor sanitize API (optional, ADC)
+   egress → OTLP → Cloud Trace/Monitoring
    images ← Artifact Registry remote mirror ← ghcr.io/berriai
 ```
 
@@ -235,6 +238,7 @@ sequenceDiagram
   participant C as Client
   participant LB as HTTPS LB
   participant GW as Gateway app
+  participant MA as Model Armor
   participant VK as Valkey
   participant PG as Cloud SQL
   participant VX as Vertex AI
@@ -249,6 +253,10 @@ sequenceDiagram
     PG-->>GW: key metadata, cached back into Valkey
   end
   GW->>VK: router picks a deployment, skips cooled-down ones
+  opt Model Armor enabled, pre_call
+    GW->>MA: sanitize prompt via ADC runtime SA
+    MA-->>GW: allow or block verdict
+  end
   GW->>VX: chat request via ADC runtime SA
   VX-->>GW: completion and token usage
   GW->>PG: record spend and usage async
@@ -270,6 +278,11 @@ Step notes (grounded in LiteLLM docs):
 - **Valkey vs Postgres:** Valkey holds the *fast, shared* counters/cooldowns and
   the auth cache; Postgres is the *authoritative* store for keys and the spend
   ledger. (See §7 and [caching](https://docs.litellm.ai/docs/proxy/caching).)
+- **Guardrail (optional):** when `enable_model_armor` is set, a **pre_call** check
+  sends the prompt to the Model Armor sanitize API (keyless ADC). Under
+  `INSPECT_ONLY` it logs findings and continues; under `INSPECT_AND_BLOCK` a
+  violation returns an error **before** the model call. Off by default and
+  gated — see §8.5.
 - **Secret Manager** is touched at **boot** (secret env), not per request.
 
 ---
