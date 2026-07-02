@@ -362,33 +362,29 @@ and out of scope for the OSS build — see [`../docs/LIMITATIONS.md`](../docs/LI
 terraform test        # plan-mode assertions with mocked providers (no cloud calls)
 ```
 
-## Known follow-up: LiteLLM OTEL emission
+## OpenTelemetry tracing (working on v1.89.2)
 
-The GCP telemetry pipeline is verified working — the Google-built OTel Collector
-sidecar runs on gateway + backend, receives OTLP on `localhost:4317/4318`, and
-exports traces to **Cloud Trace** and metrics to **Cloud Monitoring** with the
-correct IAM (`roles/cloudtrace.agent`, `roles/monitoring.metricWriter`).
+Tracing works end-to-end: LiteLLM emits OTLP (via `litellm_settings: callbacks:
+["otel"]` + `OTEL_EXPORTER=otlp_http`, `OTEL_ENDPOINT=http://localhost:4318`) to
+the Google-built OTel Collector sidecar, which exports to **Cloud Trace** (and
+metrics to **Cloud Monitoring**) using the runtime SA.
 
-However, the split `litellm-gateway:v1.86.0-dev` staging image does **not emit
-any OTLP**, and we confirmed this is an **image limitation, not config**:
+- **Version matters:** verified on **`v1.89.2`** (the module default). The older
+  `v1.86.0-dev` split image did **not** emit — emission was fixed by the newer
+  release, not by config.
+- A chat request produces a nested trace attributed to the gateway workload:
+  `/v1/chat/completions` → `Received Proxy Server Request` → `auth`,
+  `proxy_pre_call`, `router`, `litellm_request`, `postgres`, `batch_write_to_db`.
+- `litellm_request` (the nested LLM-call span) is off by default since v1.81 — set
+  `USE_OTEL_LITELLM_REQUEST_SPAN=true` (e.g. via `gateway_extra_env`) to include it.
 
-- The module enables the OSS OTEL integration correctly — `litellm_settings:
-  callbacks: ["otel"]` is in the mounted `config.yaml`, with
-  `OTEL_EXPORTER=otlp_http` and `OTEL_ENDPOINT=http://localhost:4318`.
-- With that config and **successful real-model calls**, the app logs show **no
-  OTLP export attempt** and **no spans reach Cloud Trace** (only Cloud Run/GFE
-  platform samples like `/health` and Cloud SQL Query Insights spans appear).
-  The `otel` callback loads as a silent no-op — the slimmed split image appears
-  to omit the OpenTelemetry instrumentation.
-
-**To get traces, change the image** (the config is already right): a stable
-LiteLLM release tag, or the non-split `litellm` image. The moment LiteLLM emits,
-spans flow to Cloud Trace with no other change — the collector sidecar is healthy
-and ready.
-
-> Note: the collector sidecar consumes ~1 vCPU per gateway/backend instance. While
-> LiteLLM isn't emitting, that's overhead for no telemetry — consider right-sizing
-> the app/collector CPU split or gating the sidecar until an emitting image is used.
+**Known limitation — not joined with the LB/platform trace.** LiteLLM starts its
+own trace id rather than adopting Cloud Run's incoming `X-Cloud-Trace-Context`, so
+the app trace (above) is separate from the Cloud Run/GFE request trace. Joining
+them needs Google trace-context propagation (W3C `traceparent` vs Google's header,
+and the `opentelemetry-propagator-gcp` package — see upstream
+[#22762](https://github.com/BerriAI/litellm/issues/22762)). The app-level trace is
+the useful LLM breakdown regardless.
 
 ## GCP Developer Knowledge MCP
 

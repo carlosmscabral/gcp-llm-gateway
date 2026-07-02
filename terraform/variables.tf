@@ -129,9 +129,9 @@ variable "image_mirror_credentials_secret_version" {
 }
 
 variable "image_tag" {
-  description = "Tag applied to all four litellm-* images when composed from image_registry."
+  description = "Tag applied to all four litellm-* images when composed from image_registry. Use a stable release tag (verified: v1.89.2)."
   type        = string
-  default     = "v1.86.0-dev"
+  default     = "v1.89.2"
 }
 
 variable "gateway_image" {
