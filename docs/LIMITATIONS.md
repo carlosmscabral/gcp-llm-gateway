@@ -30,6 +30,19 @@ why, so the module stays fully functional on OSS.
 | Model Armor **multi-language detection** | **Exposed** | Enabled by default (`model_armor_multi_language = true`). |
 | Memorystore Valkey endpoint attribute | `psc_auto_connections` marked deprecated | Read with a `try(...)` fallback to the newer `endpoints` shape. |
 
+## Observability gaps (OTEL tracing)
+
+OTEL tracing **works** on the default image (`v1.89.2`): a chat request produces a
+nested app-level trace in Cloud Trace via the OTel Collector sidecar. The gaps are
+about *stitching*, not emission:
+
+| Gap | Detail |
+|---|---|
+| **App trace not joined with the platform trace** | LiteLLM starts its own trace id and does **not** adopt Cloud Run's incoming `X-Cloud-Trace-Context`, so `Client → LB (GFE) → Cloud Run → app` is not one distributed trace. Joining needs a Google trace-context propagator (W3C `traceparent` vs Google's header; `opentelemetry-propagator-gcp`) — upstream [BerriAI/litellm#22762](https://github.com/BerriAI/litellm/issues/22762). Within the gateway the app spans **are** correctly nested into one trace. |
+| **No cross-service chat spans** | The `gateway → backend` hop is the management/control plane (keys, teams, models) and is **not** in the `/v1/chat/completions` data path, so there is nothing to stitch across services for a chat request. |
+| **Downstream not traced** | Calls to **Vertex AI** and **Cloud SQL** are not traced into the app trace — the `litellm_request` and `postgres` spans are client-side timings only, not spans emitted by those Google services. |
+| **`litellm_request` span** | Off in LiteLLM by default since v1.81; this module force-enables it (`USE_OTEL_LITELLM_REQUEST_SPAN=true`) so it is always present. |
+
 ## What this means
 
 - Every feature in this module works on **OSS LiteLLM** with GCP-native services.

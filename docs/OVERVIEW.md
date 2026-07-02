@@ -158,7 +158,9 @@ Auth, rate limiting, and routing all consult Valkey first (fast, shared across
 instances) and fall back to Cloud SQL for the authoritative key record on a
 cache miss. Vertex AI is called keyless with the runtime SA. Spend is written
 back to Cloud SQL asynchronously; a span is emitted to the OTel collector, which
-exports traces to Cloud Trace and metrics to Cloud Monitoring.
+exports traces to Cloud Trace and metrics to Cloud Monitoring. (This diagram is
+the request path, not one distributed trace — the LiteLLM app trace is separate
+from the LB/Cloud Run platform trace; see [`LIMITATIONS.md`](./LIMITATIONS.md).)
 
 ---
 

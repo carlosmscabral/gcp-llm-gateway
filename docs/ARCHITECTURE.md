@@ -151,8 +151,8 @@ Cloud Run instance  (gateway revision)                    SA: runtime
 │   env (secret_key_ref → Secret Manager):                            │
 │      LITELLM_MASTER_KEY, DATABASE_URL, [LITELLM_LICENSE]            │
 │   env (plain): REDIS_HOST/PORT, REDIS_SSL=false, GCS_BUCKET_NAME,   │
-│      LITELLM_OTEL_V2=true, OTEL_EXPORTER=otlp_http,                 │
-│      OTEL_ENDPOINT=http://localhost:4318, OTEL_SERVICE_NAME, …      │
+│      OTEL_EXPORTER=otlp_http, OTEL_ENDPOINT=http://localhost:4318,  │
+│      OTEL_ENVIRONMENT_NAME, USE_OTEL_LITELLM_REQUEST_SPAN=true, …   │
 │   volume  /cloudsql          → Cloud SQL Auth Proxy unix socket     │
 │   volume  /etc/litellm/config.yaml  → GCS (gcsfuse, read-only)      │
 │                                                                     │
@@ -224,7 +224,10 @@ Details in `terraform/network.tf`, `cloudsql.tf`, `valkey.tf`, `cloudrun.tf`.
 
 ## 6. Request lifecycle — tracing a chat completion
 
-What a `POST /v1/chat/completions` touches, end to end:
+What a `POST /v1/chat/completions` touches, end to end. Note this shows the
+*request path*, not a single distributed trace: in Cloud Trace the LiteLLM
+app spans form their own trace, which is **not** joined with the LB/Cloud Run
+platform trace (see §10 for the trace-stitching limitation).
 
 ```mermaid
 sequenceDiagram
@@ -561,9 +564,25 @@ flowchart LR
 The collector runs as a sidecar on gateway + backend, receives OTLP on
 localhost, and exports **traces → Cloud Trace** and **metrics → Cloud
 Monitoring (Managed Prometheus)** using the runtime SA
-(`roles/cloudtrace.agent`, `roles/monitoring.metricWriter`). The pipeline is
-verified healthy; see the **known follow-up** in `../terraform/README.md` — the
-`-dev` LiteLLM image currently emits no spans (application-side).
+(`roles/cloudtrace.agent`, `roles/monitoring.metricWriter`). Tracing is verified
+working on the default **`v1.89.2`** image: a chat request produces a nested
+app-level trace in Cloud Trace (`/v1/chat/completions` → `Received Proxy Server
+Request` → `auth`, `proxy_pre_call`, `router`, `litellm_request`, `postgres`,
+`batch_write_to_db`). The older `v1.86.0-dev` image did **not** emit — a version
+fix, not a config one.
+
+**Trace-stitching limitation (full stack).** The LiteLLM app trace is a *separate*
+trace from the Cloud Run/GFE (load balancer) platform request trace: LiteLLM
+starts its own trace id and does not adopt the incoming `X-Cloud-Trace-Context`,
+so Client → LB → Cloud Run → app is **not** one joined trace. Joining them needs a
+Google trace-context propagator (W3C `traceparent` vs Google's header;
+`opentelemetry-propagator-gcp` — upstream
+[#22762](https://github.com/BerriAI/litellm/issues/22762)). Within the gateway the
+app spans *are* correctly nested into one trace. Note also that the
+**gateway→backend** hop is the control plane (not in the chat data path, so no
+cross-service spans to stitch) and downstream **Vertex AI / Cloud SQL** are not
+traced into the app trace (the `litellm_request` / `postgres` spans are
+client-side timings). See [`LIMITATIONS.md`](./LIMITATIONS.md).
 
 ---
 

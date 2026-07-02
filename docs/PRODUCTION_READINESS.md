@@ -14,14 +14,14 @@
 | Dimension | Simplified (today) | Mission-critical target |
 |---|---|---|
 | Regions | 1 region, 1 zone | ≥2 regions, multi-zone, active-active (or active-passive) |
-| Cloud Run | `min=1`, throttled CPU, no boost | Warm pool `min≥N`, always-on CPU, startup CPU boost, gen2, per-workload concurrency |
+| Cloud Run | `min=1`, throttled CPU, **startup boost on** | Warm pool `min≥N`, always-on CPU, gen2, per-workload concurrency |
 | Postgres | Single **ZONAL** instance, public IP | **REGIONAL** HA + read replicas (in-region & cross-region), **private IP**, connection pooling, Enterprise Plus |
 | Cache | Valkey 1 node, no TLS/auth | Sharded Valkey cluster, replicas per shard, multi-zone, **TLS + AUTH** |
 | Edge | Global HTTPS LB, plaintext allowed, `allUsers` | LB + **Cloud Armor (WAF/DDoS/rate-limit)**, **Cloud CDN**, TLS-only, **IAP**, no `allUsers` |
 | Identity | Master key + UI password | **Google-first SSO/OIDC**, IAP, virtual keys/teams/budgets, RBAC |
 | Egress | Direct VPC egress, private-ranges only | **Cloud NAT static egress IPs**, egress firewall, provider allowlisting |
 | Data protection | Google-managed keys | **CMEK** everywhere, **VPC-SC** perimeter, Binary Authorization |
-| Observability | OTel → Trace/Monitoring (pipeline ready) | Full spans + **SLOs/alerts/dashboards**, log sinks, synthetics, cost guardrails |
+| Observability | OTel → Trace/Monitoring (app traces flowing on v1.89.2; app/platform trace join pending) | Full spans + **SLOs/alerts/dashboards**, log sinks, synthetics, cost guardrails |
 | IaC/state | **Local state**, `local-exec` migration | **Remote state + locking**, CI/CD w/ WIF, policy gates, canary + rollback |
 | DR | None (single point) | Defined **RTO/RPO**, cross-region replicas, tested failover runbooks |
 
@@ -66,7 +66,7 @@ ASCII (single-region, single-zone; ⚠ = single point of failure):
                  └───────┬───────┬───────┬────────┘
                          │       │       │
                     ┌────▼──┐ ┌──▼───┐ ┌─▼────┐
-                    │gateway│ │backend│ │  ui  │     Cloud Run (min=1, throttled CPU)
+                    │gateway│ │backend│ │  ui  │     Cloud Run (min=1, throttled CPU + startup boost)
                     │+otel  │ │+otel │ │      │     ⚠ single region / single zone
                     └──┬─┬──┘ └──┬─┬─┘ └──────┘
         native CloudSQL │ │Direct VPC egress
@@ -173,8 +173,8 @@ Each item lists **Current → Target** and the concrete changes.
 ### 4.1 Compute — Cloud Run (throughput & tail latency)
 
 - **Cold starts / warmth:** raise `min_instances` to cover baseline QPS per
-  service; enable **startup CPU boost**; set **CPU always allocated** on the
-  gateway (streaming + background callbacks keep working between requests).
+  service (**startup CPU boost is already enabled**); set **CPU always allocated**
+  on the gateway (streaming + background callbacks keep working between requests).
 - **Concurrency:** tune `max_instance_request_concurrency` per workload — LLM
   streaming pins a worker for tens of seconds, so keep gateway concurrency low
   and scale out on instances; static UI concurrency stays high.
@@ -272,8 +272,10 @@ Each item lists **Current → Target** and the concrete changes.
 
 ### 4.6 Observability & operations
 
-- **Close the OTEL gap** (current open item): LiteLLM isn't emitting spans in
-  the `-dev` image — resolve so traces populate Cloud Trace end-to-end.
+- **Trace stitching** (remaining item): OTEL emission is resolved on `v1.89.2`
+  (see §9) — app traces flow to Cloud Trace. The open item is joining the LiteLLM
+  app trace with the Cloud Run/GFE platform trace via a Google trace-context
+  propagator (upstream #22762); today they are separate traces.
 - **SLOs & error budgets** (availability, p95/p99 latency, error rate) with
   Cloud Monitoring; **alerting policies** on latency, errors, saturation, DB
   connections/replication lag, cache evictions, and **cost/budget**.

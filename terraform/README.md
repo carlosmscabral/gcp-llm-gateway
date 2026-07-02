@@ -110,9 +110,6 @@ What happens during apply (~15–25 min the first time):
 terraform output
 
 # The three Cloud Run services should be Ready=True
-for s in gateway backend ui; do
-  gcloud run services describe "$(terraform output -raw project_id | sed 's/.*//')cabral-litellm-dev-$s" >/dev/null 2>&1 || true
-done
 gcloud run services list --project="$(terraform output -raw project_id)" --region="$(terraform output -raw region 2>/dev/null || echo us-central1)"
 
 # Load balancer health (LB can take a few minutes to warm; retry until 200)
@@ -321,9 +318,10 @@ curl -s -H "Authorization: Bearer $MK" -H "Content-Type: application/json" \
 
 ## 3.1 Model Armor guardrail (LLM safety)
 
-Enable Google Cloud **Model Armor** — prompt-injection/jailbreak, PII/SDP, and
-malicious-URL screening — as a native LiteLLM guardrail, authenticated keyless via
-the runtime SA (ADC):
+Enable Google Cloud **Model Armor** — responsible-AI content filters (hate,
+harassment, sexually-explicit, dangerous at `MEDIUM_AND_ABOVE`),
+prompt-injection/jailbreak, PII/SDP, and malicious-URL screening — as a native
+LiteLLM guardrail, authenticated keyless via the runtime SA (ADC):
 
 ```hcl
 enable_model_armor      = true            # creates a Model Armor template + grants modelarmor.user
@@ -338,6 +336,10 @@ model_armor_mode        = ["pre_call"]    # scan prompt (add "post_call" to scan
   `{"guardrails": ["model-armor"], ...}` in the body.
 - **Filter version:** the provider doesn't expose it; the API defaults to the
   **Stable** alias (what the template uses).
+- **Latency cost:** each guarded request adds a Model Armor round-trip — measured
+  at ~+150 ms p50 / ~+330 ms p95 (unsaturated) via the load-test A/B. With
+  `model_armor_mode = ["pre_call"]` only the **prompt** is inspected (add
+  `"post_call"` to also inspect responses, doubling the inspected volume).
 - Test it: send a request with `"guardrails": ["model-armor"]`; under `INSPECT_ONLY`
   it returns 200 and logs findings. See Model Armor tiles on the dashboard (§3.2).
 
@@ -364,10 +366,12 @@ terraform test        # plan-mode assertions with mocked providers (no cloud cal
 
 ## OpenTelemetry tracing (working on v1.89.2)
 
-Tracing works end-to-end: LiteLLM emits OTLP (via `litellm_settings: callbacks:
-["otel"]` + `OTEL_EXPORTER=otlp_http`, `OTEL_ENDPOINT=http://localhost:4318`) to
-the Google-built OTel Collector sidecar, which exports to **Cloud Trace** (and
-metrics to **Cloud Monitoring**) using the runtime SA.
+App-level tracing works within the gateway workload: LiteLLM emits OTLP (via
+`litellm_settings: callbacks: ["otel"]` + `OTEL_EXPORTER=otlp_http`,
+`OTEL_ENDPOINT=http://localhost:4318`) to the Google-built OTel Collector sidecar,
+which exports to **Cloud Trace** (and metrics to **Cloud Monitoring**) using the
+runtime SA. (One request = one nested app trace; it is *not* joined with the
+Cloud Run/LB platform trace — see the limitation below.)
 
 - **Version matters:** verified on **`v1.89.2`** (the module default). The older
   `v1.86.0-dev` split image did **not** emit — emission was fixed by the newer
@@ -375,8 +379,9 @@ metrics to **Cloud Monitoring**) using the runtime SA.
 - A chat request produces a nested trace attributed to the gateway workload:
   `/v1/chat/completions` → `Received Proxy Server Request` → `auth`,
   `proxy_pre_call`, `router`, `litellm_request`, `postgres`, `batch_write_to_db`.
-- `litellm_request` (the nested LLM-call span) is off by default since v1.81 — set
-  `USE_OTEL_LITELLM_REQUEST_SPAN=true` (e.g. via `gateway_extra_env`) to include it.
+- The nested `litellm_request` (LLM-call) span is off in LiteLLM by default since
+  v1.81, so **this module sets `USE_OTEL_LITELLM_REQUEST_SPAN=true` for you** — the
+  span is always present. Override via `gateway_extra_env` if you want to disable it.
 
 **Known limitation — not joined with the LB/platform trace.** LiteLLM starts its
 own trace id rather than adopting Cloud Run's incoming `X-Cloud-Trace-Context`, so
@@ -385,6 +390,13 @@ them needs Google trace-context propagation (W3C `traceparent` vs Google's heade
 and the `opentelemetry-propagator-gcp` package — see upstream
 [#22762](https://github.com/BerriAI/litellm/issues/22762)). The app-level trace is
 the useful LLM breakdown regardless.
+
+Two related notes on scope: (1) the **gateway→backend** hop is the management/
+control plane (keys, teams, models) and is **not** in the `/v1/chat/completions`
+data path, so there are no cross-service spans to stitch for a chat request; and
+(2) downstream Google services (Vertex AI, Cloud SQL) are **not** traced into the
+app trace — the `litellm_request` and `postgres` spans are client-side timings
+only.
 
 ## GCP Developer Knowledge MCP
 
