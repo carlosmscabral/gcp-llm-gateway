@@ -21,3 +21,10 @@ gcs_force_destroy            = true
 # No custom domain in a trial stack → serve plaintext over the LB IP.
 lb_domains         = []
 allow_plaintext_lb = true
+
+# Vertex AI "easy button" (defaults shown). The module enables the API, grants
+# the runtime SA roles/aiplatform.user, and auto-registers these Gemini models
+# against this project/region — LiteLLM calls them keyless via ADC.
+enable_vertex_ai     = true
+vertex_gemini_models = ["gemini-3.5-flash", "gemini-3.1-pro-preview"]
+# vertex_location    = "global"   # default; set a region (e.g. us-central1) for locality

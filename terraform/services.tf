@@ -8,7 +8,7 @@
 data "google_project" "this" {}
 
 locals {
-  required_apis = [
+  base_apis = [
     "compute.googleapis.com",
     "run.googleapis.com",
     "sqladmin.googleapis.com",
@@ -21,6 +21,9 @@ locals {
     "monitoring.googleapis.com",
     "iam.googleapis.com",
   ]
+
+  # Vertex AI API added only when the gateway will call Vertex models.
+  required_apis = concat(local.base_apis, var.enable_vertex_ai ? ["aiplatform.googleapis.com"] : [])
 }
 
 resource "google_project_service" "services" {

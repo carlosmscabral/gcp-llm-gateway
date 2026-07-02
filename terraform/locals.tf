@@ -33,9 +33,32 @@ locals {
   ui_image         = var.ui_image != "" ? var.ui_image : "${local.image_prefix}/litellm-ui:${var.image_tag}"
   migrations_image = var.migrations_image != "" ? var.migrations_image : "${local.image_prefix}/litellm-migrations:${var.image_tag}"
 
+  # ---------- Vertex AI auto-registered models ("easy button") ----------
+  # One model_list entry per vertex_gemini_models ID, keyless (ADC), pointed at
+  # this project + location. Merged ahead of any user-supplied model_list.
+  vertex_location = var.vertex_location != "" ? var.vertex_location : var.region
+  vertex_auto_models = var.enable_vertex_ai ? [
+    for m in var.vertex_gemini_models : {
+      model_name = m
+      litellm_params = {
+        model           = "vertex_ai/${m}"
+        vertex_project  = var.project_id
+        vertex_location = local.vertex_location
+      }
+    }
+  ] : []
+
   # ---------- proxy_config (config.yaml) ----------
-  proxy_config_enabled    = length(keys(var.proxy_config)) > 0
-  proxy_config_yaml       = local.proxy_config_enabled ? yamlencode(var.proxy_config) : ""
+  # Effective config = user proxy_config with the auto Vertex models prepended
+  # to its model_list. Lets a bare deploy serve Gemini with no proxy_config set.
+  user_model_list      = try(var.proxy_config.model_list, [])
+  effective_model_list = concat(local.vertex_auto_models, local.user_model_list)
+  effective_proxy_config = length(local.effective_model_list) > 0 ? merge(
+    var.proxy_config, { model_list = local.effective_model_list }
+  ) : var.proxy_config
+
+  proxy_config_enabled    = length(keys(local.effective_proxy_config)) > 0
+  proxy_config_yaml       = local.proxy_config_enabled ? yamlencode(local.effective_proxy_config) : ""
   proxy_config_mount_path = "/etc/litellm"
   proxy_config_file_name  = "config.yaml"
   proxy_config_volume     = "proxy-config"

@@ -443,6 +443,32 @@ variable "otel_capture_message_content" {
   }
 }
 
+# ---------- Vertex AI ("easy button") ----------
+#
+# When enabled (default), the module: enables aiplatform.googleapis.com, grants
+# the Cloud Run runtime SA roles/aiplatform.user (so LiteLLM authenticates to
+# Vertex via ADC — no key files), and auto-adds a model_list entry for each
+# model in vertex_gemini_models pointed at THIS project + region. A bare apply
+# therefore comes up serving Gemini models with nothing else to configure.
+
+variable "enable_vertex_ai" {
+  description = "Enable Vertex AI support: enable the API, grant the runtime SA roles/aiplatform.user, and auto-register vertex_gemini_models. LiteLLM uses ADC (the runtime SA) — no service-account key needed."
+  type        = bool
+  default     = true
+}
+
+variable "vertex_gemini_models" {
+  description = "Gemini model IDs auto-registered in LiteLLM when enable_vertex_ai is true. Each becomes a callable model (model_name = the ID) routed to vertex_ai/<id> in this project/location. Add Model Garden IDs (e.g. claude-...) here too."
+  type        = list(string)
+  default     = ["gemini-3.5-flash", "gemini-3.1-pro-preview"]
+}
+
+variable "vertex_location" {
+  description = "Vertex AI location for the auto-registered models. Defaults to \"global\" (the Vertex global endpoint, recommended for Gemini). Set to a specific region (e.g. us-central1) if you need data locality; empty falls back to var.region."
+  type        = string
+  default     = "global"
+}
+
 variable "otel_collector_image" {
   description = "Google-built OpenTelemetry Collector image for the Cloud Run sidecar."
   type        = string

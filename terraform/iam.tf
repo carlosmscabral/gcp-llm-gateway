@@ -38,6 +38,16 @@ resource "google_project_iam_member" "runtime_metrics" {
   member  = "serviceAccount:${google_service_account.runtime.email}"
 }
 
+# Vertex AI access for the gateway/backend (LiteLLM uses ADC = this SA). Only
+# bound when enable_vertex_ai = true.
+resource "google_project_iam_member" "runtime_vertex" {
+  count = var.enable_vertex_ai ? 1 : 0
+
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.runtime.email}"
+}
+
 # ---------- Secret accessors ----------
 
 resource "google_secret_manager_secret_iam_member" "master_key" {

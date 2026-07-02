@@ -1,3 +1,8 @@
+output "project_id" {
+  description = "GCP project the stack is deployed to."
+  value       = var.project_id
+}
+
 output "lb_ip" {
   description = "Global anycast IP of the external HTTPS load balancer."
   value       = google_compute_global_address.lb.address
