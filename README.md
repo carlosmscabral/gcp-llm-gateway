@@ -13,3 +13,5 @@ with mandatory OpenTelemetry wired to Cloud Trace and Cloud Monitoring.
 - [`docs/PRODUCTION_READINESS.md`](./docs/PRODUCTION_READINESS.md) — roadmap and
   target architecture for high-resiliency, high-throughput, mission-critical
   deployments (diagrams, phasing, RTO/RPO, Google-first security).
+- [`docs/UPDATING.md`](./docs/UPDATING.md) — how to upgrade the LiteLLM version
+  safely: mechanics, risks, step-by-step runbook, rollback, and resilience tips.
