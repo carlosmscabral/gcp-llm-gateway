@@ -506,6 +506,19 @@ flowchart TB
 
 ---
 
+### 8.5 LLM guardrails (Model Armor) — optional, GCP-first
+
+When `enable_model_armor` is set, LiteLLM's native **Model Armor** guardrail runs
+inside the gateway/backend (pre_call by default): it calls the Google Cloud Model
+Armor sanitize API (keyless **ADC** via the runtime SA + `roles/modelarmor.user`)
+to screen for **prompt injection/jailbreak, PII/SDP, and malicious URLs**. Default
+`INSPECT_ONLY` (observe + log, don't block) and `fail_on_error=false` so it never
+breaks traffic. Findings surface as Cloud Logging `SanitizeOperation` entries and
+as `modelarmor.googleapis.com/template/*` counts on the dashboard. Applied globally
+(`default_on`) or per request (`guardrails: ["model-armor"]`) — LiteLLM has no
+percentage sampler. See [`LIMITATIONS.md`](./LIMITATIONS.md) for the filter-version
+provider gap and the enterprise-only Prometheus metrics path.
+
 ## 9. Boot & deploy sequence
 
 ```mermaid

@@ -317,6 +317,45 @@ curl -s -H "Authorization: Bearer $MK" -H "Content-Type: application/json" \
 
 ---
 
+# Part 3 — Safety & observability (GCP-first)
+
+## 3.1 Model Armor guardrail (LLM safety)
+
+Enable Google Cloud **Model Armor** — prompt-injection/jailbreak, PII/SDP, and
+malicious-URL screening — as a native LiteLLM guardrail, authenticated keyless via
+the runtime SA (ADC):
+
+```hcl
+enable_model_armor      = true            # creates a Model Armor template + grants modelarmor.user
+model_armor_enforcement = "INSPECT_ONLY"  # observe + log (default) or INSPECT_AND_BLOCK
+model_armor_default_on  = false           # false = opt-in per request; true = every request
+model_armor_mode        = ["pre_call"]    # scan prompt (add "post_call" to scan responses)
+# model_armor_multi_language = true        # multi-language detection (default on)
+```
+
+- **Sampling:** LiteLLM has no percentage sampler. Use `model_armor_default_on = true`
+  for 100%, or leave it `false` and opt in per request with
+  `{"guardrails": ["model-armor"], ...}` in the body.
+- **Filter version:** the provider doesn't expose it; the API defaults to the
+  **Stable** alias (what the template uses).
+- Test it: send a request with `"guardrails": ["model-armor"]`; under `INSPECT_ONLY`
+  it returns 200 and logs findings. See Model Armor tiles on the dashboard (§3.2).
+
+## 3.2 Cloud Monitoring dashboard, alerts, uptime
+
+On by default (`enable_monitoring = true`), built from **GCP-native** metrics (no
+LiteLLM license needed):
+
+- A dashboard (`terraform output monitoring_dashboard_url`): gateway request rate /
+  p95 latency / 5xx / instances, Cloud SQL connections + CPU, Valkey CPU, and Model
+  Armor filter counts (when enabled).
+- Alert policies: gateway p95 latency, Cloud SQL connections, uptime failing
+  (attach channels via `alert_notification_channels`).
+- An uptime check on the LB `/health/liveliness`.
+
+LLM-native metrics (LiteLLM `/metrics` → Managed Prometheus) are **enterprise-gated**
+and out of scope for the OSS build — see [`../docs/LIMITATIONS.md`](../docs/LIMITATIONS.md).
+
 ## Terraform tests
 
 ```bash

@@ -163,6 +163,11 @@ ASCII (multi-region, active-active):
 
 ## 4. Dimension-by-dimension roadmap
 
+> Already implemented in the base module (gated, GCP-first): **Model Armor**
+> guardrail (§4.5 safety) and a **Cloud Monitoring dashboard + alerts + uptime
+> check** (§4.6). LLM-native `/metrics` → Managed Prometheus is enterprise-gated —
+> see [`LIMITATIONS.md`](./LIMITATIONS.md).
+
 Each item lists **Current → Target** and the concrete changes.
 
 ### 4.1 Compute — Cloud Run (throughput & tail latency)

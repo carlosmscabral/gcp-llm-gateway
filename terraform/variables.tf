@@ -528,6 +528,12 @@ variable "model_armor_default_on" {
   default     = false
 }
 
+variable "model_armor_multi_language" {
+  description = "Enable Model Armor multi-language detection on the template (default true). Note: Model Armor 'filter version' (Stable alias) is NOT exposed by the Terraform provider yet; the API defaults to Stable."
+  type        = bool
+  default     = true
+}
+
 # ---------- Observability (Cloud Monitoring dashboard + alerts + uptime) ----------
 
 variable "enable_monitoring" {

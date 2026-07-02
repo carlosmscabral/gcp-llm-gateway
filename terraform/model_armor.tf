@@ -55,6 +55,14 @@ resource "google_model_armor_template" "this" {
   template_metadata {
     enforcement_type        = var.model_armor_enforcement
     log_sanitize_operations = true # emit Cloud Logging sanitize logs (for latency/analysis)
+
+    # Multi-language detection (default on). NOTE: Model Armor "filter version"
+    # (the Stable alias shown in the console) is not exposed by the Terraform
+    # provider as of google ~> 6.x; the API defaults to Stable, so templates use
+    # Stable filters by default. Pin explicitly via API/gcloud if ever required.
+    multi_language_detection {
+      enable_multi_language_detection = var.model_armor_multi_language
+    }
   }
 
   depends_on = [google_project_service.services]
