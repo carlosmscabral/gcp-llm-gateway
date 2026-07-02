@@ -104,10 +104,16 @@ rejects), `model-acl` (asks for a model the key can't use → rejects), `ramp`
 Model Armor emits request/filter **counts** but no latency metric, so measure the
 added latency by comparing two runs on the authoritative Cloud Run p95:
 
-1. Baseline — run only the `throughput` profile (plain), note gateway p95 in `report.md`.
-2. Armored — enable the `armored` profile (same shape + `"guardrails": ["model-armor"]`),
-   disable `throughput`, run, note p95.
-3. Delta ≈ Model Armor pre_call overhead.
+Run a plain profile and a `guardrails: ["model-armor"]` profile **side by side**
+with the same rate + prompt, at a rate **below** gateway saturation (a saturated
+run measures queue wait, not the guardrail). k6 emits **per-profile**
+`http_req_duration` sub-metrics, so each profile's p50/p95 is in its
+`summary-*.json`; the delta ≈ Model Armor's added latency.
+
+Two gotchas we hit: set **`model_armor_default_on = false`** or the "plain" profile
+also runs Model Armor (delta ≈ 0); and vary/repeat carefully — measured overhead
+was **~+150ms median / +330ms p95** unsaturated, but climbs sharply under load
+(and, with `fail_on_error=false`, Model Armor errors **fail open**).
 
 Per-request opt-in (`guardrails` in the profile) is also how you "sample" Model
 Armor when `model_armor_default_on = false` — LiteLLM has no percentage sampler.
