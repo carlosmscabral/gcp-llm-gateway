@@ -370,17 +370,25 @@ exports traces to **Cloud Trace** and metrics to **Cloud Monitoring** with the
 correct IAM (`roles/cloudtrace.agent`, `roles/monitoring.metricWriter`).
 
 However, the split `litellm-gateway:v1.86.0-dev` staging image does **not emit
-any OTLP** despite the documented config (`LITELLM_OTEL_V2=true`,
-`OTEL_EXPORTER=otlp_http`, `OTEL_ENDPOINT=http://localhost:4318`) — its startup
-logs show no OpenTelemetry initialization. This is an application/image-version
-issue, not an infra one. To resolve, try (in order):
+any OTLP**, and we confirmed this is an **image limitation, not config**:
 
-1. A stable LiteLLM release tag instead of `-dev` (`image_tag`).
-2. Adding standard OTel SDK env vars via `gateway_extra_env` / `backend_extra_env`:
-   `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`, `OTEL_TRACES_EXPORTER=otlp`.
-3. The non-split `litellm` image.
+- The module enables the OSS OTEL integration correctly — `litellm_settings:
+  callbacks: ["otel"]` is in the mounted `config.yaml`, with
+  `OTEL_EXPORTER=otlp_http` and `OTEL_ENDPOINT=http://localhost:4318`.
+- With that config and **successful real-model calls**, the app logs show **no
+  OTLP export attempt** and **no spans reach Cloud Trace** (only Cloud Run/GFE
+  platform samples like `/health` and Cloud SQL Query Insights spans appear).
+  The `otel` callback loads as a silent no-op — the slimmed split image appears
+  to omit the OpenTelemetry instrumentation.
 
-The moment LiteLLM sends spans, they will flow to Cloud Trace with no infra change.
+**To get traces, change the image** (the config is already right): a stable
+LiteLLM release tag, or the non-split `litellm` image. The moment LiteLLM emits,
+spans flow to Cloud Trace with no other change — the collector sidecar is healthy
+and ready.
+
+> Note: the collector sidecar consumes ~1 vCPU per gateway/backend instance. While
+> LiteLLM isn't emitting, that's overhead for no telemetry — consider right-sizing
+> the app/collector CPU split or gating the sidecar until an emitting image is used.
 
 ## GCP Developer Knowledge MCP
 

@@ -74,9 +74,17 @@ locals {
     }
   }] : []
 
+  # OTEL is mandatory: always register the "otel" callback (merged with any
+  # user-supplied callbacks) so LiteLLM emits spans to the collector sidecar.
+  effective_litellm_settings = merge(
+    try(var.proxy_config.litellm_settings, {}),
+    { callbacks = distinct(concat(try(var.proxy_config.litellm_settings.callbacks, []), ["otel"])) },
+  )
+
   proxy_overrides = merge(
     length(local.effective_model_list) > 0 ? { model_list = local.effective_model_list } : {},
     length(local.model_armor_guardrail) > 0 ? { guardrails = concat(try(var.proxy_config.guardrails, []), local.model_armor_guardrail) } : {},
+    { litellm_settings = local.effective_litellm_settings },
   )
   effective_proxy_config = merge(var.proxy_config, local.proxy_overrides)
 
@@ -97,9 +105,11 @@ locals {
   otel_environment_name = var.otel_environment_name != "" ? var.otel_environment_name : var.env
   otel_local_endpoint   = var.otel_exporter == "otlp_grpc" ? "http://localhost:4317" : "http://localhost:4318"
 
-  # LiteLLM always ships OTLP to the in-pod collector sidecar.
+  # LiteLLM ships OTLP to the in-pod collector sidecar via the OSS "otel" callback
+  # (enabled in litellm_settings below). The callback reads OTEL_EXPORTER +
+  # OTEL_ENDPOINT. (The LITELLM_OTEL_V2 flag alone did NOT emit in the split
+  # -dev image, so we use the mature v1 callback path.)
   otel_shared_env_kv = [
-    { name = "LITELLM_OTEL_V2", value = "true" },
     { name = "OTEL_EXPORTER", value = var.otel_exporter },
     { name = "OTEL_ENDPOINT", value = local.otel_local_endpoint },
     { name = "OTEL_ENVIRONMENT_NAME", value = local.otel_environment_name },
