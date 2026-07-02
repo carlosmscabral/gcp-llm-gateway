@@ -8,6 +8,8 @@ with mandatory OpenTelemetry wired to Cloud Trace and Cloud Monitoring.
 
 - [`terraform/`](./terraform) — the module + its [README](./terraform/README.md)
   (usage, prerequisites, tests).
+- [`loadtest/`](./loadtest) — repeatable, config-driven k6 load/stress test on
+  Cloud Run Jobs; see its [README](./loadtest/README.md) to run and re-configure.
 - [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — heavily-visual architecture
   reference: components, network paths, request lifecycle, the Postgres/Valkey
   data model, and the security model (diagrams throughout).

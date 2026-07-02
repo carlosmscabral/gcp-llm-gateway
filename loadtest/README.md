@@ -50,6 +50,38 @@ cd loadtest
 ./run.sh teardown
 ```
 
+### Re-running later
+
+The harness is fully repeatable — nothing to rebuild between runs:
+
+```bash
+cd loadtest
+# 1. edit config.json (scale / profiles) as needed
+./run.sh all            # setup → run → collect → teardown
+```
+
+Each run is namespaced by a timestamp `run_id`, so results never collide
+(`results/<run-id>/`). To keep several configs around, point `CONFIG` at an
+alternate file instead of editing `config.json`:
+
+```bash
+CONFIG=./scenarios/spike.json ./run.sh all
+```
+
+Only rebuild the k6 image (`./run.sh build`) after editing `k6/loadtest.js`.
+
+### Removing the harness
+
+Per-run keys/config are cleaned by `teardown`. To remove the harness
+infrastructure itself (AR repo, results bucket, SA, Job):
+
+```bash
+cd ../terraform
+terraform apply -var-file=dev.tfvars -var enable_loadtest=false
+```
+
+The base LiteLLM deployment is unaffected.
+
 ## Configuring scale & profiles — `config.json`
 
 - `tasks` — number of parallel Cloud Run Job tasks (load is split across them).
