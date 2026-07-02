@@ -13,6 +13,9 @@ with mandatory OpenTelemetry wired to Cloud Trace and Cloud Monitoring.
 - [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — heavily-visual architecture
   reference: components, network paths, request lifecycle, the Postgres/Valkey
   data model, and the security model (diagrams throughout).
+- [`docs/OVERVIEW.md`](./docs/OVERVIEW.md) — concise visual overview (system context,
+  containers, request lifecycle, data model, load-test), with a Structurizr C4 model
+  in [`docs/workspace.dsl`](./docs/workspace.dsl).
 - [`docs/DESIGN_DECISIONS.md`](./docs/DESIGN_DECISIONS.md) — why each choice in the
   current *simplified* architecture was made, with the production upgrade path.
 - [`docs/PRODUCTION_READINESS.md`](./docs/PRODUCTION_READINESS.md) — roadmap and
