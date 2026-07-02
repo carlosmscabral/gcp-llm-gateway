@@ -146,14 +146,15 @@
 - **Trade-off:** more moving parts than a single container.
 - **Prod path →** per-workload scaling/concurrency tuning (Roadmap §4.1).
 
-### D2. `min_instances = 1`, default CPU behavior
-- **What:** Each service keeps one warm instance; no startup CPU boost; default
-  CPU allocation.
+### D2. `min_instances = 1`, request-throttled CPU with startup boost
+- **What:** Each service keeps one warm instance; **startup CPU boost is enabled**
+  on the gateway/backend app containers for faster scale-up; CPU is request-based
+  (throttled between requests), not always-allocated.
 - **Why:** Cheapest posture that avoids the worst cold starts for a dev/test
-  stack.
-- **Trade-off:** cold-start latency under scale-up; no burst headroom on boot.
-- **Prod path →** warm pool `min≥N`, **startup CPU boost**, **CPU always
-  allocated** (Roadmap §4.1).
+  stack, while boost cushions the scale-up path.
+- **Trade-off:** still some cold-start latency on scale-up; throttled CPU means no
+  background work between requests (matters for streaming/async callbacks).
+- **Prod path →** warm pool `min≥N` and **CPU always allocated** (Roadmap §4.1).
 
 ### D3. Internal-LB ingress + `allUsers` invoker
 - **What:** Services are `INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER`; an
@@ -175,7 +176,10 @@
   exporter can't supply. The dependency ordering avoids dropping boot spans.
 - **Trade-off:** +1 container (CPU/mem) per instance; total CPU must be a valid
   Cloud Run value (app + sidecar).
-- **Prod path →** unchanged pattern; just resolve the LiteLLM emission gap (§F1).
+- **Prod path →** unchanged pattern. (LiteLLM span emission — previously a gap on
+  the `v1.86.0-dev` image — is resolved on the default `v1.89.2`; the remaining
+  nicety is joining the app trace with the Cloud Run/GFE platform trace, see
+  [`LIMITATIONS.md`](./LIMITATIONS.md).)
 
 ### D5. UI runs under a separate zero-permission service account
 - **What:** `ui_runtime` SA has **no** IAM bindings; gateway/backend/job share
@@ -304,6 +308,34 @@
 
 ---
 
+## I. Safety & observability (GCP-first add-ons)
+
+### I1. Model Armor as a native LiteLLM guardrail (gated)
+- **What:** `enable_model_armor` creates a `google_model_armor_template` (RAI,
+  prompt-injection/jailbreak, malicious-URI, SDP), grants the runtime SA
+  `roles/modelarmor.user`, and registers LiteLLM's native `model_armor` guardrail
+  in the effective proxy config (keyless **ADC**, `fail_on_error = false`).
+- **Why:** GCP-first LLM safety with no keys and no extra services; the guardrail
+  runs in-process in LiteLLM and calls Model Armor's sanitize API.
+- **Defaults for measurement:** `INSPECT_ONLY` (observe + log, don't block) and
+  `fail_on_error=false` so you can quantify impact before enforcing.
+- **Sampling:** LiteLLM has **no percentage sampler** — `model_armor_default_on`
+  toggles 100% vs per-request opt-in (`guardrails: ["model-armor"]`).
+- **Trade-off / provider gap:** Model Armor **filter version** ("Stable" alias)
+  isn't exposed by the provider (API defaults to Stable); multi-language **is**
+  exposed (on by default). Model Armor adds a per-call round-trip — **measured at
+  ~+150 ms p50 / ~+330 ms p95** (unsaturated) via the load-test A/B; with
+  `pre_call` only the prompt is inspected (see LIMITATIONS.md).
+
+### I2. Observability from GCP-native metrics (default on)
+- **What:** `enable_monitoring` (default true) creates one Cloud Monitoring
+  dashboard (Cloud Run / Cloud SQL / Valkey + Model Armor tiles), alert policies,
+  and an uptime check — from GCP's own metrics.
+- **Why:** works on OSS LiteLLM with **no license**; the LLM-native `/metrics` →
+  Managed Prometheus path is enterprise-gated (see [`LIMITATIONS.md`](./LIMITATIONS.md)).
+- **Trade-off:** server-side latency (Cloud Run distribution) is authoritative;
+  per-key/per-model spend needs the enterprise metrics path.
+
 ## Summary map: simplification ↔ production lever
 
 | Area | Simplified choice | First production upgrade |
@@ -311,7 +343,7 @@
 | VPC | Direct VPC egress, no PSA | + Cloud NAT static egress, VPC-SC |
 | Cloud SQL | Single ZONAL, public IP + native connector | REGIONAL HA + read replicas + private IP + pooling |
 | Valkey | 1 node, no TLS/AUTH, PSC | Cluster + replicas + TLS/AUTH, multi-zone |
-| Cloud Run | min=1, default CPU | Warm pool + CPU boost + always-on CPU, multi-region |
+| Cloud Run | min=1, throttled CPU + startup boost | Warm pool + always-on CPU, multi-region |
 | Edge | HTTPS LB, plaintext allowed, `allUsers` | Cloud Armor + CDN + TLS-only + IAP |
 | Identity | Master key + UI password | Google SSO/OIDC + IAP + virtual keys/RBAC |
 | Images | AR remote mirror | + Binary Authorization + scanning |

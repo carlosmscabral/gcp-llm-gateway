@@ -58,6 +58,11 @@ output "db_url_secret_id" {
   value       = google_secret_manager_secret.db_url.secret_id
 }
 
+output "monitoring_dashboard_url" {
+  description = "Cloud Monitoring dashboard URL (empty unless enable_monitoring)."
+  value       = var.enable_monitoring ? "https://console.cloud.google.com/monitoring/dashboards/builder/${basename(google_monitoring_dashboard.this[0].id)}?project=${var.project_id}" : ""
+}
+
 output "loadtest_job_name" {
   description = "Name of the k6 load-test Cloud Run Job (empty unless enable_loadtest)."
   value       = var.enable_loadtest ? google_cloud_run_v2_job.loadtest[0].name : ""

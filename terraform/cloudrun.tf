@@ -55,6 +55,7 @@ resource "google_cloud_run_v2_service" "gateway" {
           cpu    = var.gateway_cpu
           memory = var.gateway_memory
         }
+        startup_cpu_boost = true # faster cold starts during scale-up
       }
 
       dynamic "env" {
@@ -230,6 +231,7 @@ resource "google_cloud_run_v2_service" "backend" {
           cpu    = var.backend_cpu
           memory = var.backend_memory
         }
+        startup_cpu_boost = true # faster cold starts during scale-up
       }
 
       dynamic "env" {

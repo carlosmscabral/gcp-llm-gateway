@@ -53,13 +53,40 @@ locals {
   ] : []
 
   # ---------- proxy_config (config.yaml) ----------
-  # Effective config = user proxy_config with the auto Vertex models prepended
-  # to its model_list. Lets a bare deploy serve Gemini with no proxy_config set.
+  # Effective config = user proxy_config with auto Vertex models prepended to its
+  # model_list and the Model Armor guardrail registered (when enabled). Lets a
+  # bare deploy serve Gemini and enable safety with no proxy_config authoring.
   user_model_list      = try(var.proxy_config.model_list, [])
   effective_model_list = concat(local.vertex_auto_models, local.user_model_list)
-  effective_proxy_config = length(local.effective_model_list) > 0 ? merge(
-    var.proxy_config, { model_list = local.effective_model_list }
-  ) : var.proxy_config
+
+  # LiteLLM Model Armor guardrail (native, ADC auth). default_on=false means
+  # opt-in per request (`guardrails: ["model-armor"]`) — LiteLLM has no % sampler.
+  model_armor_guardrail = var.enable_model_armor ? [{
+    guardrail_name = "model-armor"
+    litellm_params = {
+      guardrail     = "model_armor"
+      mode          = var.model_armor_mode
+      template_id   = local.model_armor_template_id
+      project_id    = var.project_id
+      location      = local.model_armor_location
+      default_on    = var.model_armor_default_on
+      fail_on_error = false
+    }
+  }] : []
+
+  # OTEL is mandatory: always register the "otel" callback (merged with any
+  # user-supplied callbacks) so LiteLLM emits spans to the collector sidecar.
+  effective_litellm_settings = merge(
+    try(var.proxy_config.litellm_settings, {}),
+    { callbacks = distinct(concat(try(var.proxy_config.litellm_settings.callbacks, []), ["otel"])) },
+  )
+
+  proxy_overrides = merge(
+    length(local.effective_model_list) > 0 ? { model_list = local.effective_model_list } : {},
+    length(local.model_armor_guardrail) > 0 ? { guardrails = concat(try(var.proxy_config.guardrails, []), local.model_armor_guardrail) } : {},
+    { litellm_settings = local.effective_litellm_settings },
+  )
+  effective_proxy_config = merge(var.proxy_config, local.proxy_overrides)
 
   proxy_config_enabled    = length(keys(local.effective_proxy_config)) > 0
   proxy_config_yaml       = local.proxy_config_enabled ? yamlencode(local.effective_proxy_config) : ""
@@ -78,13 +105,17 @@ locals {
   otel_environment_name = var.otel_environment_name != "" ? var.otel_environment_name : var.env
   otel_local_endpoint   = var.otel_exporter == "otlp_grpc" ? "http://localhost:4317" : "http://localhost:4318"
 
-  # LiteLLM always ships OTLP to the in-pod collector sidecar.
+  # LiteLLM ships OTLP to the in-pod collector sidecar via the OSS "otel" callback
+  # (enabled in litellm_settings below). The callback reads OTEL_EXPORTER +
+  # OTEL_ENDPOINT. (The LITELLM_OTEL_V2 flag alone did NOT emit in the split
+  # -dev image, so we use the mature v1 callback path.)
   otel_shared_env_kv = [
-    { name = "LITELLM_OTEL_V2", value = "true" },
     { name = "OTEL_EXPORTER", value = var.otel_exporter },
     { name = "OTEL_ENDPOINT", value = local.otel_local_endpoint },
     { name = "OTEL_ENVIRONMENT_NAME", value = local.otel_environment_name },
     { name = "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", value = var.otel_capture_message_content },
+    # Emit the nested litellm_request span (off by default since LiteLLM v1.81).
+    { name = "USE_OTEL_LITELLM_REQUEST_SPAN", value = "true" },
   ]
   gateway_otel_env_kv_raw = concat(local.otel_shared_env_kv, [
     { name = "OTEL_SERVICE_NAME", value = "${local.name}-gateway" },

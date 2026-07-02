@@ -27,6 +27,7 @@ locals {
     local.base_apis,
     var.enable_vertex_ai ? ["aiplatform.googleapis.com"] : [],
     var.enable_loadtest ? ["cloudbuild.googleapis.com"] : [],
+    var.enable_model_armor ? ["modelarmor.googleapis.com"] : [],
   )
 }
 

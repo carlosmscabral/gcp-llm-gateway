@@ -129,9 +129,9 @@ variable "image_mirror_credentials_secret_version" {
 }
 
 variable "image_tag" {
-  description = "Tag applied to all four litellm-* images when composed from image_registry."
+  description = "Tag applied to all four litellm-* images when composed from image_registry. Use a stable release tag (verified: v1.89.2)."
   type        = string
-  default     = "v1.86.0-dev"
+  default     = "v1.89.2"
 }
 
 variable "gateway_image" {
@@ -190,9 +190,9 @@ variable "gateway_min_instances" {
 }
 
 variable "gateway_max_instances" {
-  description = "Upper bound on gateway Cloud Run instances."
+  description = "Upper bound on gateway Cloud Run instances. A gateway is I/O-bound, so scale horizontally (Cloud Run bills per running instance and scales back to min when idle)."
   type        = number
-  default     = 10
+  default     = 50
 }
 
 variable "gateway_max_instance_request_concurrency" {
@@ -220,9 +220,9 @@ variable "backend_min_instances" {
 }
 
 variable "backend_max_instances" {
-  description = "Upper bound on backend Cloud Run instances."
+  description = "Upper bound on backend Cloud Run instances (management/control plane)."
   type        = number
-  default     = 4
+  default     = 10
 }
 
 variable "backend_max_instance_request_concurrency" {
@@ -479,6 +479,85 @@ variable "otel_collector_image" {
   description = "Google-built OpenTelemetry Collector image for the Cloud Run sidecar."
   type        = string
   default     = "us-docker.pkg.dev/cloud-ops-agents-artifacts/google-cloud-opentelemetry-collector/otelcol-google:0.151.0"
+}
+
+# ---------- Model Armor (GCP LLM safety guardrail) ----------
+#
+# Wires LiteLLM's native Google Cloud Model Armor guardrail (prompt-injection /
+# jailbreak, PII/SDP, malicious-URL) authenticated via ADC (the runtime SA).
+# Defaults are measurement-friendly: INSPECT_ONLY (log, don't block) and
+# fail_on_error=false, so you can quantify impact before enforcing.
+
+variable "enable_model_armor" {
+  description = "Create a Model Armor template, grant the runtime SA modelarmor.user, and register the LiteLLM model_armor guardrail."
+  type        = bool
+  default     = false
+}
+
+variable "model_armor_location" {
+  description = "Model Armor region (regional service; e.g. us-central1). Defaults to var.region."
+  type        = string
+  default     = ""
+}
+
+variable "model_armor_template_id" {
+  description = "Existing Model Armor template ID to use. Empty creates one named `<tenant>-litellm-<env>-armor`."
+  type        = string
+  default     = ""
+}
+
+variable "model_armor_enforcement" {
+  description = "INSPECT_ONLY (observe + log, don't block — good for measuring) or INSPECT_AND_BLOCK."
+  type        = string
+  default     = "INSPECT_ONLY"
+  validation {
+    condition     = contains(["INSPECT_ONLY", "INSPECT_AND_BLOCK"], var.model_armor_enforcement)
+    error_message = "model_armor_enforcement must be INSPECT_ONLY or INSPECT_AND_BLOCK."
+  }
+}
+
+variable "model_armor_mode" {
+  description = "When the guardrail runs: any of pre_call (scan prompt), post_call (scan response), during_call. Fewer = less latency."
+  type        = list(string)
+  default     = ["pre_call"]
+}
+
+variable "model_armor_default_on" {
+  description = "true = run Model Armor on EVERY request (100%). false = opt-in per request via `guardrails: [\"model-armor\"]` (client-controlled sampling). LiteLLM has no built-in percentage sampler."
+  type        = bool
+  default     = false
+}
+
+variable "model_armor_multi_language" {
+  description = "Enable Model Armor multi-language detection on the template (default true). Note: Model Armor 'filter version' (Stable alias) is NOT exposed by the Terraform provider yet; the API defaults to Stable."
+  type        = bool
+  default     = true
+}
+
+# ---------- Observability (Cloud Monitoring dashboard + alerts + uptime) ----------
+
+variable "enable_monitoring" {
+  description = "Create a Cloud Monitoring dashboard, alert policies, and an uptime check for the gateway (uses GCP-native metrics; no app changes)."
+  type        = bool
+  default     = true
+}
+
+variable "alert_notification_channels" {
+  description = "Notification channel IDs to attach to alert policies (projects/<p>/notificationChannels/<id>). Empty creates policies that don't notify."
+  type        = list(string)
+  default     = []
+}
+
+variable "gateway_latency_p95_alert_ms" {
+  description = "Alert when gateway request p95 latency exceeds this many milliseconds."
+  type        = number
+  default     = 8000
+}
+
+variable "sql_connections_alert" {
+  description = "Alert when Cloud SQL active connections exceed this count (fan-out ceiling)."
+  type        = number
+  default     = 150
 }
 
 # ---------- Load / stress test harness (gated; off by default) ----------

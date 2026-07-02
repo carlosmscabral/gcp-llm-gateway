@@ -24,8 +24,20 @@ const rejects = new Counter('litellm_rejects');
 export const options = {
   discardResponseBodies: true, // we only need status/timing at load
   scenarios: buildScenarios(cfg),
-  thresholds: cfg.thresholds || {},
+  thresholds: buildThresholds(cfg),
 };
+
+// Per-profile latency sub-metrics: a trivially-true threshold forces k6 to track
+// http_req_duration tagged by profile, so the summary reports p95 PER profile
+// (enables A/B latency, e.g. Model-Armor-on vs off).
+function buildThresholds(cfg) {
+  const th = Object.assign({}, cfg.thresholds || {});
+  for (const p of cfg.profiles) {
+    if (p.enabled === false) continue;
+    th[`http_req_duration{profile:${p.name}}`] = ['p(95)>=0'];
+  }
+  return th;
+}
 
 function buildScenarios(cfg) {
   const s = {};
@@ -65,12 +77,17 @@ export function runProfile() {
   const name = exec.scenario.name;
   const p = profilesByName[name];
   const url = `${cfg.base_url}/v1/chat/completions`;
-  const payload = JSON.stringify({
+  const body = {
+    // p.prompt lets a profile send fixed content (e.g. a policy-violating prompt
+    // to exercise Model Armor blocking); otherwise a benign synthetic prompt.
     model: p.model,
-    messages: [{ role: 'user', content: makePrompt(p.prompt_tokens) }],
+    messages: [{ role: 'user', content: p.prompt || makePrompt(p.prompt_tokens) }],
     stream: !!p.stream,
     max_tokens: p.max_tokens || 32,
-  });
+  };
+  // Per-request guardrail opt-in (e.g. ["model-armor"]) for A/B latency tests.
+  if (p.guardrails) body.guardrails = p.guardrails;
+  const payload = JSON.stringify(body);
   const params = {
     headers: { Authorization: `Bearer ${p.key}`, 'Content-Type': 'application/json' },
     tags: { profile: name, model: p.model },

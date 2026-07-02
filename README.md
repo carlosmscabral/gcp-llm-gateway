@@ -23,3 +23,9 @@ with mandatory OpenTelemetry wired to Cloud Trace and Cloud Monitoring.
   deployments (diagrams, phasing, RTO/RPO, Google-first security).
 - [`docs/UPDATING.md`](./docs/UPDATING.md) — how to upgrade the LiteLLM version
   safely: mechanics, risks, step-by-step runbook, rollback, and resilience tips.
+- [`docs/PRICING.md`](./docs/PRICING.md) — what the gateway adds to your GCP bill:
+  a fixed floor plus per-traffic cost across sample monthly profiles (grounded on
+  GCP pricing; excludes Vertex model tokens, includes Model Armor).
+- [`docs/LIMITATIONS.md`](./docs/LIMITATIONS.md) — OSS-first scope: which LiteLLM
+  features are enterprise-only (e.g. Prometheus `/metrics` → Managed Prometheus)
+  and Terraform provider gaps, with the GCP-native equivalents we use instead.
