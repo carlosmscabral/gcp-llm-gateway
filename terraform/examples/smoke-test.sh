@@ -11,9 +11,8 @@
 # Usage (from the terraform/ directory, after `terraform apply`):
 #   ./examples/smoke-test.sh [MODEL_NAME]
 #
-# MODEL_NAME defaults to "gemini-flash" (the model_name you gave the Vertex
-# entry in proxy_config). Override BASE_URL / MASTER_KEY to skip the Terraform
-# and gcloud lookups.
+# MODEL_NAME defaults to "gemini-3.5-flash" (an auto-registered Vertex model).
+# Override BASE_URL / MASTER_KEY to skip the Terraform and gcloud lookups.
 #
 # Requires: terraform, gcloud, curl, python3.
 

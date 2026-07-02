@@ -243,7 +243,7 @@ proxy_config = {
 ## 2.4 Test the whole flow
 
 Use the included script (from the `terraform/` directory, after `apply`). It
-defaults to `gemini-2.5-flash`:
+defaults to `gemini-3.5-flash`:
 
 ```bash
 ./examples/smoke-test.sh                 # or: ./examples/smoke-test.sh gemini-3.1-pro-preview
