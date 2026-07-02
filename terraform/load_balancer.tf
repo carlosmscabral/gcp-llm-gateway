@@ -2,11 +2,21 @@
 # URL map mirrors the helm ingress routing: LLM data-plane → gateway, UI asset
 # paths → ui, everything else → backend (management API).
 #
-# Default: plain HTTP on port 80. Set var.lb_domains to provision a
-# Google-managed cert + 443 rule and redirect 80 → 443.
+# TLS is on by default with zero DNS setup: the module derives a hostname from
+# the LB's static IP via nip.io (`<ip>.nip.io` resolves to `<ip>`) and gets a
+# Google-managed certificate for it. Bring-your-own domains via var.lb_domains
+# override nip.io. Set var.allow_plaintext_lb = true to fall back to HTTP-only.
 
 locals {
-  tls_enabled = length(var.lb_domains) > 0
+  # nip.io hostname derived from the reserved LB IP (no DNS records needed).
+  nip_io_domain = "${google_compute_global_address.lb.address}.nip.io"
+
+  # Domain precedence: customer domains > nip.io (unless plaintext opt-out).
+  effective_lb_domains = length(var.lb_domains) > 0 ? var.lb_domains : (
+    var.use_nip_io_tls && !var.allow_plaintext_lb ? [local.nip_io_domain] : []
+  )
+
+  tls_enabled = length(local.effective_lb_domains) > 0
 }
 
 resource "google_compute_global_address" "lb" {
@@ -142,10 +152,10 @@ resource "google_compute_global_forwarding_rule" "http" {
 resource "google_compute_managed_ssl_certificate" "this" {
   count = local.tls_enabled ? 1 : 0
 
-  name = "${local.name}-cert-${substr(sha1(join(",", var.lb_domains)), 0, 8)}"
+  name = "${local.name}-cert-${substr(sha1(join(",", local.effective_lb_domains)), 0, 8)}"
 
   managed {
-    domains = var.lb_domains
+    domains = local.effective_lb_domains
   }
 
   lifecycle {

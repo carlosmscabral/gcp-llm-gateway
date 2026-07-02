@@ -9,8 +9,8 @@ output "lb_ip" {
 }
 
 output "lb_url" {
-  description = "Proxy URL. HTTPS when lb_domains is set (points at the first domain), otherwise HTTP at the anycast IP."
-  value       = local.tls_enabled ? "https://${var.lb_domains[0]}" : "http://${google_compute_global_address.lb.address}"
+  description = "Proxy URL. HTTPS at the effective domain (customer domain, else the nip.io hostname) when TLS is enabled; otherwise HTTP at the anycast IP."
+  value       = local.tls_enabled ? "https://${local.effective_lb_domains[0]}" : "http://${google_compute_global_address.lb.address}"
 }
 
 output "gateway_service_url" {

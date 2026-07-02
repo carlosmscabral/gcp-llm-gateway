@@ -18,9 +18,12 @@ cloudsql_deletion_protection = false
 valkey_deletion_protection   = false
 gcs_force_destroy            = true
 
-# No custom domain in a trial stack → serve plaintext over the LB IP.
-lb_domains         = []
-allow_plaintext_lb = true
+# TLS is on by default via nip.io (<lb-ip>.nip.io) — no DNS setup needed.
+# Bring your own domain instead by listing it here (point it at the lb_ip output):
+#   lb_domains = ["gw.example.com"]
+# Or force HTTP-only for a quick trial:
+#   allow_plaintext_lb = true
+lb_domains = []
 
 # Vertex AI "easy button" (defaults shown). The module enables the API, grants
 # the runtime SA roles/aiplatform.user, and auto-registers these Gemini models

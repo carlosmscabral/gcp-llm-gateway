@@ -368,13 +368,19 @@ variable "valkey_deletion_protection" {
 # ---------- Load balancer / TLS ----------
 
 variable "lb_domains" {
-  description = "DNS names for a Google-managed SSL certificate fronting the LB. Empty disables TLS (combine with allow_plaintext_lb = true)."
+  description = "Bring-your-own DNS names for the Google-managed SSL cert fronting the LB. When set, these override the nip.io default. Point each at the lb_ip output."
   type        = list(string)
   default     = []
 }
 
+variable "use_nip_io_tls" {
+  description = "When lb_domains is empty, serve TLS on an auto-derived `<lb-ip>.nip.io` hostname with a Google-managed cert — no DNS setup needed. Great for dev; not for production. Set allow_plaintext_lb = true to opt out entirely."
+  type        = bool
+  default     = true
+}
+
 variable "allow_plaintext_lb" {
-  description = "Opt into HTTP-only mode on the LB. `terraform plan` fails when lb_domains = [] unless this is true."
+  description = "Opt into HTTP-only mode on the LB (disables both nip.io TLS and managed certs). `terraform plan` fails when there is no domain and this is false."
   type        = bool
   default     = false
 }
