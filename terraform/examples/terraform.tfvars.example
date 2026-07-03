@@ -1,33 +1,150 @@
-# Copy to a *.tfvars file and fill in. Keep real secrets out of VCS — prefer
-# TF_VAR_litellm_master_key / TF_VAR_litellm_license env vars for those.
+# =============================================================================
+# Example tfvars for the LiteLLM-on-GCP gateway.
+#
+# Copy to a real file (e.g. `cp examples/terraform.tfvars.example prod.tfvars`),
+# edit, then: `terraform apply -var-file=prod.tfvars`.
+#
+# SECRETS: never put the master key or LiteLLM license here. Leave them unset to
+# auto-generate the master key, or pass them out-of-band:
+#   export TF_VAR_litellm_master_key="sk-...."      # optional; auto-generated if empty
+#   export TF_VAR_litellm_license="....."           # only for LiteLLM enterprise
+#
+# Everything below shows the DEFAULTS unless noted; commented lines are optional
+# knobs you can uncomment. A bare copy (just project_id) already deploys a working
+# Gemini gateway.
+# =============================================================================
 
-project_id = "gcp-llm-gateway-cabral"
-region     = "us-central1"
-tenant     = "acme"
+# ---- Core identity --------------------------------------------------------
+project_id = "my-gcp-project"   # REQUIRED — your GCP project id
+region     = "us-central1"      # Cloud Run / Cloud SQL / Valkey region
+tenant     = "acme"             # names resources: <tenant>-litellm-<env>
 env        = "dev"
 
-# LiteLLM images live on GHCR, which Cloud Run cannot pull directly. Either
-# point image_registry at an Artifact Registry remote repo mirroring ghcr.io,
-# or set the four *_image URIs explicitly.
-# image_registry = "us-central1-docker.pkg.dev/gcp-llm-gateway-cabral/litellm/berriai"
-# image_tag      = "v1.89.2"   # default; use a stable release tag
+# Free-form labels applied to resources.
+# labels = { team = "platform", cost-center = "ai" }
 
-# Cheapest footprint for a test stack.
-db_availability_type         = "ZONAL"
-cloudsql_deletion_protection = false
+# ---- Images ---------------------------------------------------------------
+# LiteLLM images live on GHCR, which Cloud Run cannot pull directly. By default
+# the module creates an Artifact Registry REMOTE mirror of ghcr.io/berriai and
+# pulls through it — nothing to set. Override only to pin a registry/tag:
+# image_registry = "us-central1-docker.pkg.dev/my-gcp-project/litellm/berriai"
+# image_tag      = "v1.89.2"   # default; prefer an immutable release tag over -dev/latest
+
+# ---- Footprint / cost (see docs/PRICING.md) -------------------------------
+# Cheapest posture for a dev/test stack:
+db_availability_type         = "ZONAL"   # REGIONAL for in-region HA (~2x Cloud SQL cost)
+cloudsql_deletion_protection = false     # true in production
 valkey_deletion_protection   = false
-gcs_force_destroy            = true
+gcs_force_destroy            = true      # allow `terraform destroy` to empty buckets
 
-# TLS is on by default via nip.io (<lb-ip>.nip.io) — no DNS setup needed.
-# Bring your own domain instead by listing it here (point it at the lb_ip output):
-#   lb_domains = ["gw.example.com"]
-# Or force HTTP-only for a quick trial:
-#   allow_plaintext_lb = true
+# Sizing defaults (shown). Trim memory to cut the always-on floor; raise max for scale.
+# db_tier               = "db-custom-2-7680"   # 2 vCPU / 7.5GB; db-custom-1-3840 is cheaper
+# gateway_cpu           = "1000m"
+# gateway_memory        = "4Gi"                # 2Gi roughly halves idle memory cost
+# gateway_min_instances = 1                    # 0 = scale-to-zero (cold starts) to save cost
+# gateway_max_instances = 50
+
+# ---- Networking / TLS -----------------------------------------------------
+# TLS is on by default via nip.io (https://<lb-ip>.nip.io) — no DNS setup needed.
 lb_domains = []
+# Bring your own domain (point its A record at the `lb_ip` output after first apply):
+#   lb_domains = ["gw.example.com"]
+# Or force HTTP-only for a quick trial (no TLS):
+#   allow_plaintext_lb = true
 
-# Vertex AI "easy button" (defaults shown). The module enables the API, grants
-# the runtime SA roles/aiplatform.user, and auto-registers these Gemini models
-# against this project/region — LiteLLM calls them keyless via ADC.
+# ---- Vertex AI "easy button" ---------------------------------------------
+# Enables the API, grants the runtime SA roles/aiplatform.user, and auto-registers
+# these Gemini models (keyless via ADC). Clients call them by model_name.
 enable_vertex_ai     = true
 vertex_gemini_models = ["gemini-3.5-flash", "gemini-3.1-pro-preview"]
 # vertex_location    = "global"   # default; set a region (e.g. us-central1) for locality
+
+# Partner / MaaS models (Anthropic Claude, DeepSeek, Llama, ...) are region-specific,
+# so register them here with a per-model location. ENABLE EACH IN VERTEX MODEL GARDEN
+# first (accept terms / quota). All Vertex models also get use_in_pass_through=true,
+# so native SDKs work via the /vertex_ai passthrough. See docs/CLIENT_GUIDE.md.
+# vertex_partner_models = [
+#   { model_name = "claude-opus", model = "vertex_ai/claude-opus-4-7",                vertex_location = "global" },
+#   { model_name = "deepseek",    model = "vertex_ai/deepseek-ai/deepseek-v3.2-maas", vertex_location = "us-central1" },
+# ]
+
+# ---- LiteLLM proxy config (config.yaml) -----------------------------------
+# Merged with the module: the Vertex models above are prepended to model_list, and
+# the OTEL callback (+ Model Armor guardrail, if enabled) are added automatically.
+# Use this to add models and tune LiteLLM behavior.
+proxy_config = {
+  model_list = [
+    # A keyless mock model — handy for smoke tests (no tokens billed).
+    {
+      model_name = "mock-gpt"
+      litellm_params = {
+        model         = "gpt-3.5-turbo"
+        mock_response = "Hello from the mock model!"
+      }
+    },
+
+    # A custom Gemini ALIAS with pinned params + a per-model rate limit. Clients
+    # call "gemini-flash-creative"; it maps to vertex_ai/gemini-3.5-flash.
+    {
+      model_name = "gemini-flash-creative"
+      litellm_params = {
+        model           = "vertex_ai/gemini-3.5-flash"
+        vertex_project  = "my-gcp-project"
+        vertex_location = "global"
+        temperature     = 0.9
+        rpm             = 600
+      }
+    },
+
+    # A self-hosted / OpenAI-compatible endpoint (e.g. vLLM). The api_key uses
+    # LiteLLM's env indirection — set MY_LLM_KEY via gateway_extra_env below.
+    # {
+    #   model_name = "my-llama"
+    #   litellm_params = {
+    #     model    = "openai/llama-3.1-8b-instruct"
+    #     api_base = "https://vllm.internal.example.com/v1"
+    #     api_key  = "os.environ/MY_LLM_KEY"
+    #   }
+    # },
+  ]
+
+  # Proxy-wide behavior. (callbacks are managed by the module for OTEL — anything
+  # you set here is merged, not overwritten.)
+  litellm_settings = {
+    num_retries     = 3
+    request_timeout = 600
+    # drop_params   = true   # silently drop provider-unsupported params instead of erroring
+    # Route around a failing model automatically:
+    fallbacks = [
+      { "gemini-3.5-flash" = ["gemini-3.1-pro-preview"] },
+    ]
+  }
+
+  # Router load-balancing across duplicate model_name entries.
+  # router_settings = {
+  #   routing_strategy = "usage-based-routing-v2"   # or "simple-shuffle", "least-busy"
+  # }
+}
+
+# Extra env vars injected into the gateway/backend app containers (e.g. secrets the
+# proxy_config references via os.environ/...). Prefer TF_VAR_* for real secrets.
+# gateway_extra_env = { MY_LLM_KEY = "changeme" }
+
+# ---- Safety: Model Armor guardrail (optional, GCP-first) ------------------
+# Creates a Model Armor template + grants modelarmor.user; native LiteLLM guardrail.
+# enable_model_armor      = true
+# model_armor_enforcement = "INSPECT_ONLY"   # observe+log (default) or INSPECT_AND_BLOCK
+# model_armor_default_on  = false            # false = opt-in per request; true = every request
+# model_armor_mode        = ["pre_call"]     # add "post_call" to also screen responses
+# See docs/PRICING.md — Model Armor is the most traffic-sensitive cost line.
+
+# ---- Observability (on by default) ----------------------------------------
+enable_monitoring = true   # Cloud Monitoring dashboard + uptime check + 3 alert policies
+# Wire alerts to a channel (create it first; id from `gcloud beta monitoring channels list`):
+# alert_notification_channels  = ["projects/my-gcp-project/notificationChannels/1234567890"]
+# gateway_latency_p95_alert_ms = 8000
+# sql_connections_alert        = 150
+
+# ---- Load-test harness (optional) -----------------------------------------
+# Creates the k6 Cloud Run Job + results bucket. Off by default. See loadtest/.
+# enable_loadtest = true
