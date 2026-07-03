@@ -41,13 +41,33 @@ locals {
   # One model_list entry per vertex_gemini_models ID, keyless (ADC), pointed at
   # this project + location. Merged ahead of any user-supplied model_list.
   vertex_location = var.vertex_location != "" ? var.vertex_location : var.region
+  # use_in_pass_through lets clients call the NATIVE Vertex passthrough
+  # (/vertex_ai/...:generateContent, :rawPredict) authenticated only by a LiteLLM
+  # key — the proxy injects the runtime SA's ADC for this project+location. Without
+  # it, passthrough forwards no Google credentials and Vertex returns 401.
   vertex_auto_models = var.enable_vertex_ai ? [
     for m in var.vertex_gemini_models : {
       model_name = m
       litellm_params = {
-        model           = "vertex_ai/${m}"
-        vertex_project  = var.project_id
-        vertex_location = local.vertex_location
+        model               = "vertex_ai/${m}"
+        vertex_project      = var.project_id
+        vertex_location     = local.vertex_location
+        use_in_pass_through = true
+      }
+    }
+  ] : []
+
+  # Partner / MaaS models (Claude, DeepSeek, ...) with a per-model location, since
+  # Vertex partner models are region-specific (e.g. Claude in us-east5). model_name
+  # is the callable name; model is the full LiteLLM id (vertex_ai/...).
+  vertex_partner_auto_models = var.enable_vertex_ai ? [
+    for m in var.vertex_partner_models : {
+      model_name = m.model_name
+      litellm_params = {
+        model               = m.model
+        vertex_project      = var.project_id
+        vertex_location     = coalesce(m.vertex_location, local.vertex_location)
+        use_in_pass_through = true
       }
     }
   ] : []
@@ -57,7 +77,7 @@ locals {
   # model_list and the Model Armor guardrail registered (when enabled). Lets a
   # bare deploy serve Gemini and enable safety with no proxy_config authoring.
   user_model_list      = try(var.proxy_config.model_list, [])
-  effective_model_list = concat(local.vertex_auto_models, local.user_model_list)
+  effective_model_list = concat(local.vertex_auto_models, local.vertex_partner_auto_models, local.user_model_list)
 
   # LiteLLM Model Armor guardrail (native, ADC auth). default_on=false means
   # opt-in per request (`guardrails: ["model-armor"]`) — LiteLLM has no % sampler.
