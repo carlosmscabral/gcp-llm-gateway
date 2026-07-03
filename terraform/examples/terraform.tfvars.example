@@ -25,6 +25,12 @@ gcs_force_destroy            = true
 #   allow_plaintext_lb = true
 lb_domains = []
 
+# Let the gateway serve models registered via the Admin UI (stored in the DB),
+# not only those defined in proxy_config / config.yaml.
+gateway_extra_env = {
+  STORE_MODEL_IN_DB = "true"
+}
+
 # Vertex AI "easy button" (defaults shown). The module enables the API, grants
 # the runtime SA roles/aiplatform.user, and auto-registers these Gemini models
 # against this project/region — LiteLLM calls them keyless via ADC.
