@@ -1,0 +1,4 @@
+# Vendor SDKs used to prove native-client access through the gateway.
+openai>=1.40
+anthropic>=0.40
+google-genai>=1.0
