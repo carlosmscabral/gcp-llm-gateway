@@ -475,6 +475,16 @@ variable "vertex_location" {
   default     = "global"
 }
 
+variable "vertex_partner_models" {
+  description = "Vertex Model Garden / partner + MaaS models to register with a PER-MODEL location (Gemini uses the simpler vertex_gemini_models). Each entry: model_name (the callable name clients use), model (full LiteLLM id, e.g. vertex_ai/claude-sonnet-4@20250514 or vertex_ai/deepseek-ai/deepseek-v3.1-maas), and optional vertex_location (falls back to var.vertex_location). Partner/MaaS models are region-specific and must be enabled in Vertex Model Garden first (terms/quota)."
+  type = list(object({
+    model_name      = string
+    model           = string
+    vertex_location = optional(string)
+  }))
+  default = []
+}
+
 variable "otel_collector_image" {
   description = "Google-built OpenTelemetry Collector image for the Cloud Run sidecar."
   type        = string

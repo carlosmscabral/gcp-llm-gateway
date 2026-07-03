@@ -16,6 +16,10 @@ with mandatory OpenTelemetry wired to Cloud Trace and Cloud Monitoring.
 - [`docs/OVERVIEW.md`](./docs/OVERVIEW.md) — concise visual overview (system context,
   containers, request lifecycle, data model, load-test), with a Structurizr C4 model
   in [`docs/workspace.dsl`](./docs/workspace.dsl).
+- [`docs/CLIENT_GUIDE.md`](./docs/CLIENT_GUIDE.md) — client perspective: how to call
+  Vertex models (Gemini/Claude/DeepSeek) via OpenAI, Anthropic, `google-genai`, or
+  native passthrough — and the native-fidelity vs governance trade-off per SDK, with
+  a verified feature matrix.
 - [`docs/DESIGN_DECISIONS.md`](./docs/DESIGN_DECISIONS.md) — why each choice in the
   current *simplified* architecture was made, with the production upgrade path.
 - [`docs/PRODUCTION_READINESS.md`](./docs/PRODUCTION_READINESS.md) — roadmap and

@@ -97,7 +97,7 @@ terraform apply -var-file=dev.tfvars
 
 What happens during apply (~15–25 min the first time):
 1. APIs enabled, VPC/subnets, Secret Manager, IAM, and the image mirror.
-2. Cloud SQL (~3–5 min) and Memorystore Valkey (~5–8 min) provision.
+2. Cloud SQL (≈3–5 min) and Memorystore Valkey (≈5–8 min) provision.
 3. The **migration Cloud Run Job runs automatically** (`prisma migrate deploy`)
    via a `local-exec` that calls `gcloud run jobs execute --wait`.
 4. Gateway, backend, and UI roll out (each pulling images through the mirror and
@@ -262,12 +262,21 @@ proxy_config = {
   ```bash
   gcloud ai models list --region=us-central1 --project=MY_PROJECT_ID 2>/dev/null | head
   ```
-- **Model Garden / "Agent Platform" partner models** (Anthropic Claude, Llama,
-  etc. hosted in Vertex) use the same provider and the same keyless ADC auth —
-  just add their IDs to `vertex_gemini_models`, e.g.
-  `claude-sonnet-4@20250514` → routed as `vertex_ai/claude-sonnet-4@20250514`.
-  (Vertex AI *Agent Engine/Builder* agents are a different API, not proxied as
-  `/chat/completions` models.)
+- **Model Garden / partner + MaaS models** (Anthropic Claude, DeepSeek, Llama,
+  etc. hosted in Vertex) use the same provider and keyless ADC auth, but are
+  **region-specific**, so register them via **`vertex_partner_models`** (per-model
+  `vertex_location`) rather than `vertex_gemini_models`:
+  ```hcl
+  vertex_partner_models = [
+    { model_name = "claude-opus", model = "vertex_ai/claude-opus-4-7",              vertex_location = "global" },
+    { model_name = "deepseek",    model = "vertex_ai/deepseek-ai/deepseek-v3.2-maas", vertex_location = "us-central1" },
+  ]
+  ```
+  Enable each model in **Vertex Model Garden** first (accept terms / quota). All
+  registered Vertex models get `use_in_pass_through = true`, so native SDKs work via
+  the `/vertex_ai` passthrough too. See [`../docs/CLIENT_GUIDE.md`](../docs/CLIENT_GUIDE.md)
+  for the full client/SDK matrix and trade-offs. (Vertex AI *Agent Engine/Builder*
+  agents are a different API, not proxied as `/chat/completions` models.)
 - To disable Vertex entirely, set `enable_vertex_ai = false`.
 
 ## 2.4 Test the whole flow
@@ -337,7 +346,7 @@ model_armor_mode        = ["pre_call"]    # scan prompt (add "post_call" to scan
 - **Filter version:** the provider doesn't expose it; the API defaults to the
   **Stable** alias (what the template uses).
 - **Latency cost:** each guarded request adds a Model Armor round-trip — measured
-  at ~+150 ms p50 / ~+330 ms p95 (unsaturated) via the load-test A/B. With
+  at ≈+150 ms p50 / ≈+330 ms p95 (unsaturated) via the load-test A/B. With
   `model_armor_mode = ["pre_call"]` only the **prompt** is inspected (add
   `"post_call"` to also inspect responses, doubling the inspected volume).
 - Test it: send a request with `"guardrails": ["model-armor"]`; under `INSPECT_ONLY`
